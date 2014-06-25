@@ -4,12 +4,16 @@
 // Old toolkit constants plus a few new ones
 
 //define('CW_VERSION', '1.4.0'); // moved to ToolkitService, constant VERSION
-define('CW_DOWNLOAD_SITE', 'http://www.youngiprofessionals.com/wiki/XMLSERVICE'); // TODO move to ToolkitService.php
+define('CW_DOWNLOAD_SITE', 'http://www.youngiprofessionals.com/wiki/XMLSERVICE');
+// TODO move to ToolkitService.php
 define('CW_PERSISTENT', 'persistent');
-define('CW_EXISTING_TRANSPORT_CONN', 'existingTransportConn'); // such as a database connection
-define('CW_EXISTING_TRANSPORT_I5_NAMING','existingTransportI5Naming' ); // naming mode of the transport (true/false)
+define('CW_EXISTING_TRANSPORT_CONN', 'existingTransportConn');
+// such as a database connection
+define('CW_EXISTING_TRANSPORT_I5_NAMING', 'existingTransportI5Naming');
+// naming mode of the transport (true/false)
 // transport types can be passed into i5_connect in options array.
-define('CW_TRANSPORT_TYPE', 'transportType' ); // ibm_db2 is default transport. odbc can be used as well)
+define('CW_TRANSPORT_TYPE', 'transportType');
+// ibm_db2 is default transport. odbc can be used as well)
 
 define('I5_OPEN_READ', '1');
 define('I5_OPEN_READWRITE', '5');
@@ -192,7 +196,8 @@ define('I5_ERR_PHP_BAD_DTAARA_LENGTH', '315');
 define('I5_ERR_PHP_UNAVIABLE_PASE', '298');
 define('I5_ERR_PHP_LOCALHOST_NOT_PERMIT', '286');
 define('I5_ERR_PHP_SEEK_FIRSTLAST', '279');
-define('I5_TYPE_SHORT', 1); // I5_TYPE constants are numeric (not string)
+define('I5_TYPE_SHORT', 1);
+// I5_TYPE constants are numeric (not string)
 define('I5_TYPE_LONG', 2);
 define('I5_TYPE_INT', 2);
 define('I5_TYPE_FLOAT', 3);
@@ -204,7 +209,8 @@ define('I5_TYPE_DATE', 8);
 define('I5_TYPE_TIME', 9);
 define('I5_TYPE_TIMESTP', 10);
 define('I5_TYPE_DBCS', 11);
-define('I5_TYPE_LONG8', 13); // 8 bytes, 64-bit. doesn't exist in PHP. convert to a char? like a bigint in sql
+define('I5_TYPE_LONG8', 13);
+// 8 bytes, 64-bit. doesn't exist in PHP. convert to a char? like a bigint in sql
 define('I5_TYPE_NUMERICCHAR', 14);
 define('I5_TYPE_BLOB', 15);
 define('I5_TYPE_CLOB', 16);
@@ -263,7 +269,8 @@ define('I5_JOB_CANCEL_KEY', '301');
 define('I5_JOB_CCSID', '302');
 define('I5_JOB_CNTRYID', '303');
 define('I5_JOB_CPU_TIME', '304');
-define('I5_JOB_USRPRF', '305'); // current user profile for job
+define('I5_JOB_USRPRF', '305');
+// current user profile for job
 define('I5_JOB_COMPLETION_STS', '306');
 define('I5_JOB_POOL_ID', '307');
 define('I5_JOB_CHAR_ID_CTRL', '311');
@@ -387,5 +394,6 @@ define('I5_LOBJ_RQSLVL', '1201');
 define('I5_LOBJ_TXTCCSID', '1301');
 define('I5_LOBJ_DATACCSID', '1303');
 
-// additional constants that weren't defined by old toolkit but its error numbers were
+// additional constants that weren't defined by old toolkit but its error numbers
+// were
 define('I5_CONN_TIMEOUT', '78');

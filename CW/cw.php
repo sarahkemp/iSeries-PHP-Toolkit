@@ -5,618 +5,633 @@ require_once 'cwclasses.php';
 define('DB2_DEFAULT_USER', 'QTMHHTTP');
 define('TO_BE_IMPLEMENTED', '999');
 
-
-function d($dieOutput = 'x')
-{
-    if (is_array($dieOutput) || is_object($dieOutput)) {
-        $str = '<pre>' . print_r($dieOutput, true) . '</pre>';
-    } else {
-        $str = $dieOutput;
-    }
-    die($str);
+function d($dieOutput = 'x') {
+	if (is_array($dieOutput) || is_object($dieOutput)) {
+		$str = '<pre>' . print_r($dieOutput, true) . '</pre>';
+	} else {
+		$str = $dieOutput;
+	}
+	die($str);
 }
 
 // create unique IPC code
 function makeIpc($user, $connNum = 0) {
-    $ipcUser = ($user) ? $user : DB2_DEFAULT_USER;
-    
-    if (!$connNum) {
-    	$connNum = uniqid();
-    } 
-    //$ipc = "/tmp/abc";///tmp/ipc_cw_$ipcUser" . "_" . uniqid();
-    $ipc = "/tmp/ipc_cw_$ipcUser" . "_" . $connNum;
+	$ipcUser = ($user) ? $user : DB2_DEFAULT_USER;
 
-    return $ipc;
-} //(makeIpc)
+	if (!$connNum) {
+		$connNum = uniqid();
+	}
+	//$ipc = "/tmp/abc";///tmp/ipc_cw_$ipcUser" . "_" . uniqid();
+	$ipc = "/tmp/ipc_cw_$ipcUser" . "_" . $connNum;
 
+	return $ipc;
+}//(makeIpc)
 
 function splitLibObj($objName, $defaultLib = '') {
-    // given an object name that MAY be qualified by a library and slash and perhaps a function,
-    // such as "xxx/yyy(zzzz)".
-    // split it up and return an array of the form:
-    // [lib]=>xxx, [obj]=>yyy, [func]=>zzzz
-    // If no library, that part will take the given default or be blank.
-    //
-    // The last part can be a service program function, if enclosed in parentheses.
-    //
-    // Uppercase lib and obj values, because on IBM i they are usually uppercase but not func (mixed case).
-    $objName = trim($objName);
-    
-    $result = array('lib'=>'', 'obj'=>'', 'func'=>'');
-    $parts = explode('/', $objName);
-    if (count($parts) > 1) {
-        // both library and object were provided.
-        $result['lib'] = strtoupper($parts[0]);
-        $obj = $parts[1];
-    } else {
-        // only object (no lib) given in name.
-        $obj = $parts[0];
-        // if a default lib, use it.
-        if ($defaultLib) {
-            $result['lib'] = strtoupper($defaultLib);
-        }
-    }
-    
-    // now see if there might be a service program subprocedure in there.
-    // look in in parentheses
-    if ($obj) {
-        list($objLeft, $objFunc) = explode('(', $obj. '('); // hack: added extra '(' to ensure both vars get a value    
-    } else {
-        list($objLeft, $objFunc) = array('', '');
-    }
-    $result['obj'] = strtoupper($objLeft);
-    if ($objFunc) {
-        $result['func'] = trim($objFunc, '()');
-    }
-    
-    
-    return $result;
-} //(splitLibObj)
+	// given an object name that MAY be qualified by a library and slash and perhaps
+	// a function,
+	// such as "xxx/yyy(zzzz)".
+	// split it up and return an array of the form:
+	// [lib]=>xxx, [obj]=>yyy, [func]=>zzzz
+	// If no library, that part will take the given default or be blank.
+	//
+	// The last part can be a service program function, if enclosed in parentheses.
+	//
+	// Uppercase lib and obj values, because on IBM i they are usually uppercase but
+	// not func (mixed case).
+	$objName = trim($objName);
 
+	$result = array(
+		'lib' => '',
+		'obj' => '',
+		'func' => ''
+	);
+	$parts = explode('/', $objName);
+	if (count($parts) > 1) {
+		// both library and object were provided.
+		$result['lib'] = strtoupper($parts[0]);
+		$obj = $parts[1];
+	} else {
+		// only object (no lib) given in name.
+		$obj = $parts[0];
+		// if a default lib, use it.
+		if ($defaultLib) {
+			$result['lib'] = strtoupper($defaultLib);
+		}
+	}
+
+	// now see if there might be a service program subprocedure in there.
+	// look in in parentheses
+	if ($obj) {
+		list($objLeft, $objFunc) = explode('(', $obj . '(');
+		// hack: added extra '(' to ensure both vars get a value
+	} else {
+		list($objLeft, $objFunc) = array(
+			'',
+			''
+		);
+	}
+	$result['obj'] = strtoupper($objLeft);
+	if ($objFunc) {
+		$result['func'] = trim($objFunc, '()');
+	}
+
+	return $result;
+}//(splitLibObj)
 
 /**
  * Creates and logs a new piece of activity and error.
  * @see I5Error::setI5Error()
- * @param string $errMsg    Error message (often a CPF code but sometimes just a message)
+ * @param string $errMsg    Error message (often a CPF code but sometimes just a
+ * message)
  * @param string $errDesc   Longer description of error
  * @return void
  */
-function i5ErrorActivity($errNum, $errCat = I5_CAT_PHP, $errMsg = '', $errDesc = '')
-{
-    // set the error setting
-    $errorObj = I5Error::getInstance();
-    $errorObj->setI5Error($errNum, $errCat, $errMsg, $errDesc);
-    
-    // now log it if an error.
-    if ($errNum != I5_ERR_OK) {
-        logThis($errorObj);
-    }
-    
-} //(i5ErrorActivity)
+function i5ErrorActivity($errNum, $errCat = I5_CAT_PHP, $errMsg = '', $errDesc = '') {
+	// set the error setting
+	$errorObj = I5Error::getInstance();
+	$errorObj->setI5Error($errNum, $errCat, $errMsg, $errDesc);
+
+	// now log it if an error.
+	if ($errNum != I5_ERR_OK) {
+		logThis($errorObj);
+	}
+
+}//(i5ErrorActivity)
 
 /**
  * Shortcut to i5ErrorActivity when an "AS400" or CPF error occurred.
  * @see I5ErrorActivity()
- * @param string $errMsg    Error message (often a CPF code but sometimes just a message)
+ * @param string $errMsg    Error message (often a CPF code but sometimes just a
+ * message)
  * @param string $errDesc   Longer description of error
  * @return void
  */
-function i5CpfError($errMsg = '', $errDesc = '')
-{
-    // Shortcut (fewer params) when have an IBM i (AS400) code and message.
-    i5ErrorActivity(I5_ERR_PHP_AS400_MESSAGE, I5_CAT_PHP, $errMsg, $errDesc);
-    
-} //(i5CPFError)
+function i5CpfError($errMsg = '', $errDesc = '') {
+	// Shortcut (fewer params) when have an IBM i (AS400) code and message.
+	i5ErrorActivity(I5_ERR_PHP_AS400_MESSAGE, I5_CAT_PHP, $errMsg, $errDesc);
+
+}//(i5CPFError)
 
 /**
  * Shortcut to i5ErrorActivity when no error occurred. Clears error condition.
  * @see I5ErrorActivity()
  * @return void
  */
-function noError()
-{
-    // Clear any error information.
-    i5ErrorActivity(I5_ERR_OK, 0, '', '');
-    
-} //(noError)
+function noError() {
+	// Clear any error information.
+	i5ErrorActivity(I5_ERR_OK, 0, '', '');
 
-
-
+}//(noError)
 
 // return toolkit object on success, false on error
 // if 'persistent' passed in options, do a persistent conn.
 // if CW_EXISTING_TRANSPORT_RESOURCE passed in options, use it as database conn.
-function i5_connect($host='', $user='', $password='', $options=array()) {
-    
+function i5_connect($host = '', $user = '', $password = '', $options = array()) {
 
-    // ****** special warning. We do not support proprietary codepagefile.
-    if (isset($options[I5_OPTIONS_CODEPAGEFILE])) {
-        logThis ("Instead of using I5_OPTIONS_CODEPAGEFILE, please use a combination of I5_OPTIONS_RMTCCSID and I5_OPTIONS_LOCALCP as appropriate.");
-    }  
+	// ****** special warning. We do not support proprietary codepagefile.
+	if (isset($options[I5_OPTIONS_CODEPAGEFILE])) {
+		logThis("Instead of using I5_OPTIONS_CODEPAGEFILE, please use a combination of I5_OPTIONS_RMTCCSID and I5_OPTIONS_LOCALCP as appropriate.");
+	}
 
-    // create "change job" parameters as we go, based on options
-    $jobParams = array();
-    $libl = array();
-    
-    // check and store RMTCCSID option
-    if (isset($options[I5_OPTIONS_RMTCCSID])) {
-    	$rmtCcsid = trim($options[I5_OPTIONS_RMTCCSID]);
-    	if (!is_numeric($rmtCcsid)) {
-            i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Value of I5_OPTIONS_RMTCCSID must be numeric', 'Value of I5_OPTIONS_RMTCCSID must be numeric');
-            return false; 
-    	} else {
-    		$jobParams['ccsid'] = $rmtCcsid;
-    	} //(if !is_numeric)
-    		
-    } //(if (isset($options[I5_OPTIONS_RMTCCSID])))
- 
-    // check and handle I5_OPTIONS_INITLIBL option
-    if (isset($options[I5_OPTIONS_INITLIBL])) {
-    	$initLiblString = trim($options[I5_OPTIONS_INITLIBL]);
-    	if (empty($initLiblString) || !is_string($initLiblString)) {
-            i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Value of I5_OPTIONS_INITLIBL must be a string', 'Value of I5_OPTIONS_INITLIBL must be a string');
-            return false; 
-    	} else {
-    		// initLibl must be a comma-delimited OR space-delimited (or both) list of libraries.
-    	    /* Split the string by any number of commas or space characters,
-             * which include " ", \r, \t, \n and \f
-             * We can't use explode() because the delimiters may be a combination of space and comma.
-             */
-            $libl = preg_split('/[\s,]+/', $initLiblString);
-    			
-    		if (!is_array($libl) || empty($libl)) {
-    			// if didn't get an array or it's empty, the string must have been bad.
-    		    i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Value of I5_OPTIONS_INITLIBL not a comma-delimited string of libraries', 'Value of I5_OPTIONS_INITLIBL not a comma-delimited string of libraries');
-    		    return false;
-    		} //(if result wasn't an array)
-    	} //(if !is_numeric)
-    		
-    } //(if (isset($options[I5_OPTIONS_RMTCCSID])))
-    
-    // check and store CW_PERSISTENT option
-    $isPersistent = false; // default
-    if (isset($options[CW_PERSISTENT])) {
-    	if (!is_bool($options[CW_PERSISTENT])) {
-            i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Value of CW_PERSISTENT must be boolean', 'Value of CW_PERSISTENT must be boolean');
-            return false; 
-    	} else {
-    	    $isPersistent = $options[CW_PERSISTENT];
-    	} //(if !is_numeric)
-    } //(if (isset($options[CW_PERSISTENT])))
-    
-    $isNewConn = true; //default: it's a new conn, not reusing an old one.
-    
-    // check and handle I5_OPTIONS_PRIVATE_CONNECTION option
-    if (isset($options[I5_OPTIONS_PRIVATE_CONNECTION])) {
+	// create "change job" parameters as we go, based on options
+	$jobParams = array();
+	$libl = array();
 
-    	// only works if connection is persistent, too.
-    	if (!$isPersistent) {
-    		// not persistent. this is an error.
-    		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'I5_OPTIONS_PRIVATE_CONNECTION was set but connection was not persistent. Try again using i5_pconnect().', 'I5_OPTIONS_PRIVATE_CONNECTION was set but connection was not persistent. Try again using i5_pconnect().');
-            return false;
-    	} //(!$isPersistent)
-    	
-    	// verify that the connection value is numeric
-    	$privateConnNum = trim($options[I5_OPTIONS_PRIVATE_CONNECTION]);
-    	if (!is_numeric($privateConnNum)) {
-            i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Value of I5_OPTIONS_PRIVATE_CONNECTION must be numeric', 'Value of I5_OPTIONS_PRIVATE_CONNECTION must be numeric');
-            return false; 
-    	} //(if !is_numeric)
-    	
-    	// if a 0 is passed, generate a connection number that will be used in the IPC.
-    	if ($privateConnNum == 0) {
-    		// generate a number to be saved in connection class
-    		// (Old toolkit used job number. New toolkit needs IPC before job is created.)
-    		list($microseconds,$seconds) = explode(' ',microtime());
-    		// remove decimal points or any other non-numeric from microseconds
-    		$microseconds = preg_replace('/\D/', '', $microseconds);
-            $privateConnNum = getmypid().$seconds.$microseconds; //getmypid() is a per-process number.
-    	} else {
-    		// re-using an old (non-zero) connection number. NOT a new connection.
-            $isNewConn = false;
-            
-    	} //(if ($privateConnNum == 0))
+	// check and store RMTCCSID option
+	if (isset($options[I5_OPTIONS_RMTCCSID])) {
+		$rmtCcsid = trim($options[I5_OPTIONS_RMTCCSID]);
+		if (!is_numeric($rmtCcsid)) {
+			i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Value of I5_OPTIONS_RMTCCSID must be numeric', 'Value of I5_OPTIONS_RMTCCSID must be numeric');
+			return false;
+		} else {
+			$jobParams['ccsid'] = $rmtCcsid;
+		} //(if !is_numeric)
 
-    	// Note: if a nonexistent private connection number is passed in, XMLSERVICE will create the IPC.
-    	// The old toolkit returned an error. 
-    	// We COULD duplicate that "error" behavior by checking for the existence of the number in advance,
-    	// but that might harm performance. 
+	}//(if (isset($options[I5_OPTIONS_RMTCCSID])))
 
-    } // (if (isset($options[I5_OPTIONS_PRIVATE_CONNECTION])))
-	
-    	
-    // check and handle I5_OPTIONS_IDLE_TIMEOUT
-    // Number of seconds of not being used after which a persistent/private connection job will end.
-    $idleTimeout = 0; // default of 0 means no timeout (infinite wait)
-    if (isset($options[I5_OPTIONS_IDLE_TIMEOUT])) {
-    
-        $idleTimeout = $options[I5_OPTIONS_IDLE_TIMEOUT];
-    
-    } //(I5_OPTIONS_IDLE_TIMEOUT)
-	
-    $jobName = ''; // init
-    if (isset($options[I5_OPTIONS_JOBNAME])) {
-    
-        $jobName = trim($options[I5_OPTIONS_JOBNAME]);
-    
-    } //(I5_OPTIONS_JOBNAME)
-    	
-    	
-    
-    // check and store CW_EXISTING_TRANSPORT_CONN option (such as to reuse a db connection)
-    $existingTransportResource = null;
-    $existingTransportI5NamingFlag = false;
-    if (isset($options[CW_EXISTING_TRANSPORT_CONN])) {
-    	if (!is_resource($options[CW_EXISTING_TRANSPORT_CONN])) {
-            i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Value of CW_EXISTING_TRANSPORT_CONN must be a resource',  'Value of CW_EXISTING_TRANSPORT_CONN must be a resource');
-            return false; 
-    	} else {
-    	    $existingTransportResource = $options[CW_EXISTING_TRANSPORT_CONN];
-    	    $existingTransportI5NamingFlag = (isset($options[CW_EXISTING_TRANSPORT_I5_NAMING])) ? $options[CW_EXISTING_TRANSPORT_I5_NAMING] : false;
-    	    
-    	} //(if (!is_resource))
-    } //(if (isset($options[CW_EXISTING_TRANSPORT_CONN])))
-    
+	// check and handle I5_OPTIONS_INITLIBL option
+	if (isset($options[I5_OPTIONS_INITLIBL])) {
+		$initLiblString = trim($options[I5_OPTIONS_INITLIBL]);
+		if (empty($initLiblString) || !is_string($initLiblString)) {
+			i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Value of I5_OPTIONS_INITLIBL must be a string', 'Value of I5_OPTIONS_INITLIBL must be a string');
+			return false;
+		} else {
+			// initLibl must be a comma-delimited OR space-delimited (or both) list of
+			// libraries.
+			/* Split the string by any number of commas or space characters,
+			 * which include " ", \r, \t, \n and \f
+			 * We can't use explode() because the delimiters may be a combination of space
+			 * and comma.
+			 */
+			$libl = preg_split('/[\s,]+/', $initLiblString);
 
-    
+			if (!is_array($libl) || empty($libl)) {
+				// if didn't get an array or it's empty, the string must have been bad.
+				i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Value of I5_OPTIONS_INITLIBL not a comma-delimited string of libraries', 'Value of I5_OPTIONS_INITLIBL not a comma-delimited string of libraries');
+				return false;
+			} //(if result wasn't an array)
+		} //(if !is_numeric)
+
+	}//(if (isset($options[I5_OPTIONS_RMTCCSID])))
+
+	// check and store CW_PERSISTENT option
+	$isPersistent = false;
+	// default
+	if (isset($options[CW_PERSISTENT])) {
+		if (!is_bool($options[CW_PERSISTENT])) {
+			i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Value of CW_PERSISTENT must be boolean', 'Value of CW_PERSISTENT must be boolean');
+			return false;
+		} else {
+			$isPersistent = $options[CW_PERSISTENT];
+		} //(if !is_numeric)
+	}//(if (isset($options[CW_PERSISTENT])))
+
+	$isNewConn = true;
+	//default: it's a new conn, not reusing an old one.
+
+	// check and handle I5_OPTIONS_PRIVATE_CONNECTION option
+	if (isset($options[I5_OPTIONS_PRIVATE_CONNECTION])) {
+
+		// only works if connection is persistent, too.
+		if (!$isPersistent) {
+			// not persistent. this is an error.
+			i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'I5_OPTIONS_PRIVATE_CONNECTION was set but connection was not persistent. Try again using i5_pconnect().', 'I5_OPTIONS_PRIVATE_CONNECTION was set but connection was not persistent. Try again using i5_pconnect().');
+			return false;
+		}//(!$isPersistent)
+
+		// verify that the connection value is numeric
+		$privateConnNum = trim($options[I5_OPTIONS_PRIVATE_CONNECTION]);
+		if (!is_numeric($privateConnNum)) {
+			i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Value of I5_OPTIONS_PRIVATE_CONNECTION must be numeric', 'Value of I5_OPTIONS_PRIVATE_CONNECTION must be numeric');
+			return false;
+		}//(if !is_numeric)
+
+		// if a 0 is passed, generate a connection number that will be used in the IPC.
+		if ($privateConnNum == 0) {
+			// generate a number to be saved in connection class
+			// (Old toolkit used job number. New toolkit needs IPC before job is created.)
+			list($microseconds, $seconds) = explode(' ', microtime());
+			// remove decimal points or any other non-numeric from microseconds
+			$microseconds = preg_replace('/\D/', '', $microseconds);
+			$privateConnNum = getmypid() . $seconds . $microseconds;
+			//getmypid() is a per-process number.
+		} else {
+			// re-using an old (non-zero) connection number. NOT a new connection.
+			$isNewConn = false;
+
+		} //(if ($privateConnNum == 0))
+
+		// Note: if a nonexistent private connection number is passed in, XMLSERVICE will
+		// create the IPC.
+		// The old toolkit returned an error.
+		// We COULD duplicate that "error" behavior by checking for the existence of the
+		// number in advance,
+		// but that might harm performance.
+
+	}// (if (isset($options[I5_OPTIONS_PRIVATE_CONNECTION])))
+
+	// check and handle I5_OPTIONS_IDLE_TIMEOUT
+	// Number of seconds of not being used after which a persistent/private
+	// connection job will end.
+	$idleTimeout = 0;
+	// default of 0 means no timeout (infinite wait)
+	if (isset($options[I5_OPTIONS_IDLE_TIMEOUT])) {
+
+		$idleTimeout = $options[I5_OPTIONS_IDLE_TIMEOUT];
+
+	}//(I5_OPTIONS_IDLE_TIMEOUT)
+
+	$jobName = '';
+	// init
+	if (isset($options[I5_OPTIONS_JOBNAME])) {
+
+		$jobName = trim($options[I5_OPTIONS_JOBNAME]);
+
+	}//(I5_OPTIONS_JOBNAME)
+
+	// check and store CW_EXISTING_TRANSPORT_CONN option (such as to reuse a db
+	// connection)
+	$existingTransportResource = null;
+	$existingTransportI5NamingFlag = false;
+	if (isset($options[CW_EXISTING_TRANSPORT_CONN])) {
+		if (!is_resource($options[CW_EXISTING_TRANSPORT_CONN])) {
+			i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Value of CW_EXISTING_TRANSPORT_CONN must be a resource', 'Value of CW_EXISTING_TRANSPORT_CONN must be a resource');
+			return false;
+		} else {
+			$existingTransportResource = $options[CW_EXISTING_TRANSPORT_CONN];
+			$existingTransportI5NamingFlag = (isset($options[CW_EXISTING_TRANSPORT_I5_NAMING])) ? $options[CW_EXISTING_TRANSPORT_I5_NAMING] : false;
+
+		} //(if (!is_resource))
+	}//(if (isset($options[CW_EXISTING_TRANSPORT_CONN])))
+
 	// check and store CW_TRANSPORT_TYPE, if given. It's optional.
-	$transportType = ''; // empty is ok.
-	$iniTransportType = isset( $options [CW_TRANSPORT_TYPE]) ? $options [CW_TRANSPORT_TYPE] : getConfigValue('transport', 'transportType', 'ibm_db2');
+	$transportType = '';
+	// empty is ok.
+	$iniTransportType = isset($options[CW_TRANSPORT_TYPE]) ? $options[CW_TRANSPORT_TYPE] : getConfigValue('transport', 'transportType', 'ibm_db2');
 	if ($iniTransportType) {
-		$validTransports = array ('ibm_db2', 'odbc', 'http');
+		$validTransports = array(
+			'ibm_db2',
+			'odbc',
+			'http'
+		);
 		if (!in_array($iniTransportType, $validTransports)) {
 			// invalid transport specified.
 			$errmsg = "Invalid CW_TRANSPORT_TYPE option ({$iniTransportType}). Omit or choose between " . explode(', ', $validTransports) . ".";
-			i5ErrorActivity ( I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, $errmsg, $errmsg );
+			i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, $errmsg, $errmsg);
 			return false;
 		} else {
-			// valid transport 
+			// valid transport
 			$transportType = $iniTransportType;
 		} // (if (!is_resource))
-	} //(if (isset($options[CW_EXISTING_TRANSPORT_CONN])))
-    
-    
-    
-    // localhost is default if no host was specified. 
-    if (!$host) {
-        $host = 'localhost';
-    }
-    // convert host to dbname
-    $dbname = getConfigValue('hosts', $host);
-    
-    if (!$dbname) {
-        i5ErrorActivity(I5_CONN_TIMEOUT, I5_CAT_TCPIP, "Undefined host ('$host')", "Try 'localhost' instead, or specify lookup in " . CONFIG_FILE . " ($host=DBNAME).");
-        return false;
-    }
-    
-    
-    $user = trim($user);
-    if (!$user) {
-/*        if user was not specified, use '', ''
-        which will translate to QTMHHTTP
-        when old toolkit is disabled, we won't be able to get 'i5comm.default_user'
-        from PHP.INI, and db2 will say QTMHHTTP anyway (default value of i5comm.default.user, too),
-        so just use it and document it.
-*/        
-        // OK. db2 can work with this.
-        $user = '';
-        $password = '';
-        
-    } else {
-        
-        // a user was supplied. Check user. Given the user, we also expect a password.
+	}//(if (isset($options[CW_EXISTING_TRANSPORT_CONN])))
 
-    	// user/pw rules
-    	// TODO share these with i5_adopt_authority
-    	
-        // forbid QSECOFR and usernames starting with *. (don't want *CURRENT, etc.) 
-        // TODO Actually, not sure if QSECOFR and special profiles should be forbidden. Check again with old toolkit.
-        if ((strtoupper($user) == 'QSECOFR') || (substr($user, 0, 1) == '*') || empty($password) || (substr($password, 0, 1) == '*')) {
-            i5ErrorActivity(I5_ERR_WRONGLOGIN, I5_CAT_PHP, 'Bad login user or password', 'Cannot connect with QSECOFR, blank password, or special profiles');
-            return false;
-        } //(if QSECOFR)
+	// localhost is default if no host was specified.
+	if (!$host) {
+		$host = 'localhost';
+	}
+	// convert host to dbname
+	$dbname = getConfigValue('hosts', $host);
 
-      
-    } //(if !$user)
+	if (!$dbname) {
+		i5ErrorActivity(I5_CONN_TIMEOUT, I5_CAT_TCPIP, "Undefined host ('$host')", "Try 'localhost' instead, or specify lookup in " . CONFIG_FILE . " ($host=DBNAME).");
+		return false;
+	}
 
-        // get instance of toolkit (singleton)
-    try {
-    	 if ($existingTransportResource) {
-    	 	// use existing resource
-    	 	$tkit = ToolkitServiceCw::getInstance($existingTransportResource, $existingTransportI5NamingFlag, '', '', $isPersistent);
-    	 } else {
-    	    // specify dbname, user, and password, transport type to create new transport
-    	    $tkit = ToolkitServiceCw::getInstance($dbname, $user, $password, $transportType, $isPersistent); 
-    	 } //(if ($existingTransportResource))
-         
-    	 // if getInstance() returned false (unlikely) 
-    	 if (!$tkit) {
-    	 	setError(I5_ERR_NOTCONNECTED, I5_CAT_PHP, 'Cannot get a connection', 'Cannot get a connection');
-    	 } //(if (!$tkit))
-    	 
-     } catch (Exception $e) {
+	$user = trim($user);
+	if (!$user) {
+		/*        if user was not specified, use '', ''
+		 which will translate to QTMHHTTP
+		 when old toolkit is disabled, we won't be able to get 'i5comm.default_user'
+		 from PHP.INI, and db2 will say QTMHHTTP anyway (default value of
+		i5comm.default.user, too),
+		 so just use it and document it.
+		 */
+		// OK. db2 can work with this.
+		$user = '';
+		$password = '';
 
-    // If user or password is wrong, give errNum I5_ERR_WRONGLOGIN with category I5_CAT_PHP.
-         // Determine reason for failure.
-         // Probably database authentication error or invalid or unreachable database.
-        $code = $e->getCode();
-        $msg = $e->getMessage();
-                     
-         switch ($code) {
-             case 8001:
-                 // Authorization failure on distributed database connection attempt.
-                 // Poss. wrong user or password
-                 $errNum = I5_ERR_WRONGLOGIN;
-                 break;
-             case 42705:
-                 // db not found in relational directory.
-                 // treat as host not found.
-                 $errNum = I5_CONN_TIMEOUT;
-                 break;
-                 
-             default:
-                 $errNum = I5_ERR_PHP_AS400_MESSAGE;
-                 break;
-         }    
-        i5ErrorActivity($errNum, I5_CAT_PHP,$code, $msg);
-        return false;
-    }
-    
-    // successfully instantiated toolkit connection and instance. Mark it as CW.
-    $tkit->setIsCw(true);
-    
-    
-    // override toolkit settings if nec.
-    $sbmjobParams = getConfigValue('system', 'sbmjob_params');
-    $xmlServiceLib = getConfigValue('system', 'XMLServiceLib', 'ZENDSVR');
-    
+	} else {
 
-    $stateless = false; // default
+		// a user was supplied. Check user. Given the user, we also expect a password.
 
-    $cwVersion = i5_version();
-    
-    // If we have a private conn, create an IPC based on it.
-    if (isset($privateConnNum) && $privateConnNum) {
-        $ipc = makeIpc($user, $privateConnNum);
-        // save private conn number. Can be retrieved later with getPrivateConnNum
-        $tkit->setPrivateConnNum($privateConnNum);
-        $tkit->setIsNewConn($isNewConn);
-		logThis ( "Running statefully with IPC '$ipc', private connection '$privateConnNum'. CW version $cwVersion. Service library: $xmlServiceLib" );
-        
-    } else {
-    	
-        // Not private. We may be stateless (inline).
-        $stateless = getConfigValue('system', 'stateless', false);
+		// user/pw rules
+		// TODO share these with i5_adopt_authority
 
-        if ($stateless) {
-            // don't need IPC if stateless, running in QSQ job.
-            $ipc = '';
-            logThis("Running stateless; no IPC needed. CW version $cwVersion. Service library: $xmlServiceLib");
-        } else {
-	        // TODO does this make sense? Not stateless but not private? Any purpose to stateless setting in INI file?
-        	// Not stateless, so create an IPC
-            // TODO this will change based on persistent/nonpersistent logic
-    	    // IPC to use in separate toolkit job using just user id and unique additions in makeIpc
-            $ipc = makeIpc($user);
-			logThis ( "Not private but not stateless; running with IPC '$ipc'. CW version $cwVersion. Service library: $xmlServiceLib" );
-        } //(if stateless)
-    } //(privateconn and other options for generating IPC)
-        
-    
-    // handle connection options (e.g. encoding). for those options we don't support, write to log.
-    
+		// forbid QSECOFR and usernames starting with *. (don't want *CURRENT, etc.)
+		// TODO Actually, not sure if QSECOFR and special profiles should be forbidden.
+		// Check again with old toolkit.
+		if ((strtoupper($user) == 'QSECOFR') || (substr($user, 0, 1) == '*') || empty($password) || (substr($password, 0, 1) == '*')) {
+			i5ErrorActivity(I5_ERR_WRONGLOGIN, I5_CAT_PHP, 'Bad login user or password', 'Cannot connect with QSECOFR, blank password, or special profiles');
+			return false;
+		} //(if QSECOFR)
 
+	}//(if !$user)
 
-    if ($jobName) {
-        // override any values for the last parm of $sbmjobParams
-        // check that $sbmjobParams is set and has at least one slash
-        if (!isset($sbmjobParams) || empty($sbmjobParams)) {
-        	
-        	// not specified in .INI file, but may be a default in toolkit itself.
-        	$toolkitDefaultSbmjob = $tkit->getToolkitServiceParam('sbmjobParams');
+	// get instance of toolkit (singleton)
+	try {
+		if ($existingTransportResource) {
+			// use existing resource
+			$tkit = ToolkitServiceCw::getInstance($existingTransportResource, $existingTransportI5NamingFlag, '', '', $isPersistent);
+		} else {
+			// specify dbname, user, and password, transport type to create new transport
+			$tkit = ToolkitServiceCw::getInstance($dbname, $user, $password, $transportType, $isPersistent);
+		}//(if ($existingTransportResource))
 
-        	if (!$toolkitDefaultSbmjob) {
-        	
-                i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Job name was set but SBMJOB params were not. Please set SBMJOB params in toolkit.ini', 'Job name was set but SBMJOB params were not. Please set SBMJOB params in toolkit.ini or in ToolkitService.php default settings');
-                return false;
-        	} else {
-        		// use the default as starting point
-        		$sbmjobParams = $toolkitDefaultSbmjob;
-        	}
-        } //(if sbmjobParams not set)
-        
-        // check that sbmjob params has at least one, but not more than two, slashes in it. Final format: lib/jobd/jobname
-        // Break string on forward slash.
-        $sbmjobParts = explode('/', $sbmjobParams);
-        $numParts = count($sbmjobParts);
-        if ($numParts > 3 || $numParts < 1) {
-            // should be either 1 or 2 slashes. Not more and not less 
-            i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Job name was set but SBMJOB param string was not valid. Should have one or two forward slashes. Please set SBMJOB params in toolkit.ini', 'Job name was set but SBMJOB param string was not valid. Should have one or two forward slashes. Please set SBMJOB params in toolkit.ini');
-            return false;
-        } //(invalid sbmjob param string)
-        
-        // replace last part of string with job name.
-        $sbmjobParts[2] = $jobName;
-        // reconstruct sbmjob param string.
-        
-        $sbmjobParams = implode('/', $sbmjobParts);
-        
-    } //(jobName was specified)
+		// if getInstance() returned false (unlikely)
+		if (!$tkit) {
+			setError(I5_ERR_NOTCONNECTED, I5_CAT_PHP, 'Cannot get a connection', 'Cannot get a connection');
+		} //(if (!$tkit))
 
+	} catch (Exception $e) {
 
+		// If user or password is wrong, give errNum I5_ERR_WRONGLOGIN with category
+		// I5_CAT_PHP.
+		// Determine reason for failure.
+		// Probably database authentication error or invalid or unreachable database.
+		$code = $e->getCode();
+		$msg = $e->getMessage();
 
-        
-    // set IPC and other settings
-    
-    $serviceParams = array('internalKey'       => $ipc,
-                           'stateless'         => $stateless);
+		switch ($code) {
+			case 8001:
+				// Authorization failure on distributed database connection attempt.
+				// Poss. wrong user or password
+				$errNum = I5_ERR_WRONGLOGIN;
+				break;
+			case 42705:
+				// db not found in relational directory.
+				// treat as host not found.
+				$errNum = I5_CONN_TIMEOUT;
+				break;
 
-    // additional settings
-    if ($idleTimeout) {
-        $serviceParams['idleTimeout'] = $idleTimeout;
-    }
-    if ($sbmjobParams) {
-    	// taking into account jobname preferences
-        $serviceParams['sbmjobParams'] = $sbmjobParams;
-    }
+			default:
+				$errNum = I5_ERR_PHP_AS400_MESSAGE;
+				break;
+		}
+		i5ErrorActivity($errNum, I5_CAT_PHP, $code, $msg);
+		return false;
+	}
 
-    // CW always retains data structure hierarchy (integrity) in parameters.
-    $serviceParams['dataStructureIntegrity'] = true;
+	// successfully instantiated toolkit connection and instance. Mark it as CW.
+	$tkit->setIsCw(true);
 
-    // these will be in addition to, or overriding, any params set in toolkit service constructor.
-    $tkit->setOptions($serviceParams);
-    
-    // initialize
-    $cmdArray = array();
+	// override toolkit settings if nec.
+	$sbmjobParams = getConfigValue('system', 'sbmjob_params');
+	$xmlServiceLib = getConfigValue('system', 'XMLServiceLib', 'ZENDSVR');
 
-  
-    // update the current job with options
-    // TODO: do we have to run these if it's an existing IPC/connection, private conn? Perhaps the initialization happened already.
-    if (count($jobParams)) {
-    	$cmdStr = "CHGJOB";
-    	foreach ($jobParams as $name => $value) {
-    		$cmdStr .= " $name($value)";
-    	}
-    	// add string to array of commands to run in one shot
-        $cmdArray[] = $cmdStr;	
-    }
-    
-    // update library list
-    if (count($libl)) {
-    	// this is what the old toolkit seemed to do
-    	// TODO send multiple adds in one big XML string
-    	foreach ($libl as $lib) {
-    		$cmdArray[] = "ADDLIBLE LIB($lib)";
-    	}
-    	
-    } //(if count($libl);
+	$stateless = false;
+	// default
 
-    // run multiple commands if there are any.
-    if (count($cmdArray)) {
-    	// We collect a success flag but don't examine it.
-    	// Old toolkit didn't do anything special if a connection option had invalid values.
-    	// We COULD write a message to the log, at best.
-        $success = $tkit->ClCommandWithCpf($cmdArray);
-    } //(if count($cmdArray))
-    
-        
-    // return toolkit object for other functions to use
-    return $tkit;
-    
-} //(i5_connect)
+	$cwVersion = i5_version();
+
+	// If we have a private conn, create an IPC based on it.
+	if (isset($privateConnNum) && $privateConnNum) {
+		$ipc = makeIpc($user, $privateConnNum);
+		// save private conn number. Can be retrieved later with getPrivateConnNum
+		$tkit->setPrivateConnNum($privateConnNum);
+		$tkit->setIsNewConn($isNewConn);
+		logThis("Running statefully with IPC '$ipc', private connection '$privateConnNum'. CW version $cwVersion. Service library: $xmlServiceLib");
+
+	} else {
+
+		// Not private. We may be stateless (inline).
+		$stateless = getConfigValue('system', 'stateless', false);
+
+		if ($stateless) {
+			// don't need IPC if stateless, running in QSQ job.
+			$ipc = '';
+			logThis("Running stateless; no IPC needed. CW version $cwVersion. Service library: $xmlServiceLib");
+		} else {
+			// TODO does this make sense? Not stateless but not private? Any purpose to
+			// stateless setting in INI file?
+			// Not stateless, so create an IPC
+			// TODO this will change based on persistent/nonpersistent logic
+			// IPC to use in separate toolkit job using just user id and unique additions in
+			// makeIpc
+			$ipc = makeIpc($user);
+			logThis("Not private but not stateless; running with IPC '$ipc'. CW version $cwVersion. Service library: $xmlServiceLib");
+		} //(if stateless)
+	}//(privateconn and other options for generating IPC)
+
+	// handle connection options (e.g. encoding). for those options we don't support,
+	// write to log.
+
+	if ($jobName) {
+		// override any values for the last parm of $sbmjobParams
+		// check that $sbmjobParams is set and has at least one slash
+		if (!isset($sbmjobParams) || empty($sbmjobParams)) {
+
+			// not specified in .INI file, but may be a default in toolkit itself.
+			$toolkitDefaultSbmjob = $tkit->getToolkitServiceParam('sbmjobParams');
+
+			if (!$toolkitDefaultSbmjob) {
+
+				i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Job name was set but SBMJOB params were not. Please set SBMJOB params in toolkit.ini', 'Job name was set but SBMJOB params were not. Please set SBMJOB params in toolkit.ini or in ToolkitService.php default settings');
+				return false;
+			} else {
+				// use the default as starting point
+				$sbmjobParams = $toolkitDefaultSbmjob;
+			}
+		}//(if sbmjobParams not set)
+
+		// check that sbmjob params has at least one, but not more than two, slashes in
+		// it. Final format: lib/jobd/jobname
+		// Break string on forward slash.
+		$sbmjobParts = explode('/', $sbmjobParams);
+		$numParts = count($sbmjobParts);
+		if ($numParts > 3 || $numParts < 1) {
+			// should be either 1 or 2 slashes. Not more and not less
+			i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Job name was set but SBMJOB param string was not valid. Should have one or two forward slashes. Please set SBMJOB params in toolkit.ini', 'Job name was set but SBMJOB param string was not valid. Should have one or two forward slashes. Please set SBMJOB params in toolkit.ini');
+			return false;
+		}//(invalid sbmjob param string)
+
+		// replace last part of string with job name.
+		$sbmjobParts[2] = $jobName;
+		// reconstruct sbmjob param string.
+
+		$sbmjobParams = implode('/', $sbmjobParts);
+
+	}//(jobName was specified)
+
+	// set IPC and other settings
+
+	$serviceParams = array(
+		'internalKey' => $ipc,
+		'stateless' => $stateless
+	);
+
+	// additional settings
+	if ($idleTimeout) {
+		$serviceParams['idleTimeout'] = $idleTimeout;
+	}
+	if ($sbmjobParams) {
+		// taking into account jobname preferences
+		$serviceParams['sbmjobParams'] = $sbmjobParams;
+	}
+
+	// CW always retains data structure hierarchy (integrity) in parameters.
+	$serviceParams['dataStructureIntegrity'] = true;
+
+	// these will be in addition to, or overriding, any params set in toolkit service
+	// constructor.
+	$tkit->setOptions($serviceParams);
+
+	// initialize
+	$cmdArray = array();
+
+	// update the current job with options
+	// TODO: do we have to run these if it's an existing IPC/connection, private
+	// conn? Perhaps the initialization happened already.
+	if (count($jobParams)) {
+		$cmdStr = "CHGJOB";
+		foreach ($jobParams as $name => $value) {
+			$cmdStr .= " $name($value)";
+		}
+		// add string to array of commands to run in one shot
+		$cmdArray[] = $cmdStr;
+	}
+
+	// update library list
+	if (count($libl)) {
+		// this is what the old toolkit seemed to do
+		// TODO send multiple adds in one big XML string
+		foreach ($libl as $lib) {
+			$cmdArray[] = "ADDLIBLE LIB($lib)";
+		}
+
+	}//(if count($libl);
+
+	// run multiple commands if there are any.
+	if (count($cmdArray)) {
+		// We collect a success flag but don't examine it.
+		// Old toolkit didn't do anything special if a connection option had invalid
+		// values.
+		// We COULD write a message to the log, at best.
+		$success = $tkit->ClCommandWithCpf($cmdArray);
+	}//(if count($cmdArray))
+
+	// return toolkit object for other functions to use
+	return $tkit;
+
+}//(i5_connect)
 
 function i5_pconnect($host, $user, $password, $options = array()) {
-    
-    // for private conns, it's all about the IPC key. Try to call i5_connect's guts but specify the key.
 
-	
-    // Includes private connections, too.
-    $options[CW_PERSISTENT] = true;
-    $conn = i5_connect($host, $user, $password, $options);
-    
-    return $conn;
-    
-} //(i5_pconnect)
+	// for private conns, it's all about the IPC key. Try to call i5_connect's guts
+	// but specify the key.
+
+	// Includes private connections, too.
+	$options[CW_PERSISTENT] = true;
+	$conn = i5_connect($host, $user, $password, $options);
+
+	return $conn;
+
+}//(i5_pconnect)
 
 function i5_get_property($property, $tkit) {
-    // $property is integer
-    
-    if (!in_array($property, array(I5_NEW_CONNECTION, I5_PRIVATE_CONNECTION))) {
-       i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Property must be I5_NEW_CONNECTION or I5_PRIVATE_CONNECTION', 'Property must be I5_NEW_CONNECTION or I5_PRIVATE_CONNECTION');
-       return false; 
-    } //(if !is_numeric)
-    if (!is_object($tkit)) {
-       i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Connection/toolkit param must be an object', 'Connection/toolkit param must be an object');
-       return false; 
-    } //(if !is_object)
-    
-    if ($property == I5_NEW_CONNECTION) {
-    	// determine if connection was just created now or if it existed in the past.
-    	// Seems only valid for private conns because it'd be possible to predict if initialization was done.
-    	return $tkit->isNewConn();
-    } //(new connection)    
-	
+	// $property is integer
 
-    if ($property == I5_PRIVATE_CONNECTION) {
-    	return $tkit->getPrivateConnNum();
-    } //(private connection)    
-    
-    //$isnew = i5_get_property(I5_NEW_CONNECTION, $conn);
-    //$privateConnNum = i5_get_property(I5_PRIVATE_CONNECTION, $retcon);    
-    
-} //(i5_get_property)
+	if (!in_array($property, array(
+		I5_NEW_CONNECTION,
+		I5_PRIVATE_CONNECTION
+	))) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Property must be I5_NEW_CONNECTION or I5_PRIVATE_CONNECTION', 'Property must be I5_NEW_CONNECTION or I5_PRIVATE_CONNECTION');
+		return false;
+	}//(if !is_numeric)
+	if (!is_object($tkit)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Connection/toolkit param must be an object', 'Connection/toolkit param must be an object');
+		return false;
+	}//(if !is_object)
+
+	if ($property == I5_NEW_CONNECTION) {
+		// determine if connection was just created now or if it existed in the past.
+		// Seems only valid for private conns because it'd be possible to predict if
+		// initialization was done.
+		return $tkit->isNewConn();
+	}//(new connection)
+
+	if ($property == I5_PRIVATE_CONNECTION) {
+		return $tkit->getPrivateConnNum();
+	} //(private connection)
+
+	//$isnew = i5_get_property(I5_NEW_CONNECTION, $conn);
+	//$privateConnNum = i5_get_property(I5_PRIVATE_CONNECTION, $retcon);
+
+}//(i5_get_property)
 
 // close job. not really necessary unless want to close it before script end.
 function i5_close(&$connection = null) {
-    
-    // this should run automatically when script ends.
-    
-    // if conn not passed in, get instance of toolkit. If can't be obtained, return false.
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-    
-    $connection->__destruct();
-    $connection = null;
-    // TODO try/catch. if fail return false
-    return true;
-    
-} //(i5_close)
+
+	// this should run automatically when script ends.
+
+	// if conn not passed in, get instance of toolkit. If can't be obtained, return
+	// false.
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
+
+	$connection->__destruct();
+	$connection = null;
+	// TODO try/catch. if fail return false
+	return true;
+
+}//(i5_close)
 
 function i5_pclose(&$connection = null) {
-    // end job even if persistent connection.
-    
-	// if conn not passed in, get instance of toolkit. If can't be obtained, return false.
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-	
-    $connection->disconnectPersistent();
-    // normal cleanup now
-    $connection->__destruct();
-    $connection = null;
-    // TODO try/catch. if fail return false
-    return true;
-    
-} //(i5_pclose)
+	// end job even if persistent connection.
 
+	// if conn not passed in, get instance of toolkit. If can't be obtained, return
+	// false.
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
+	$connection->disconnectPersistent();
+	// normal cleanup now
+	$connection->__destruct();
+	$connection = null;
+	// TODO try/catch. if fail return false
+	return true;
+
+}//(i5_pclose)
 
 /**
- * Changes authority of the connection to a specific user. All actions will be executed as this user from now on.
+ * Changes authority of the connection to a specific user. All actions will be
+ * executed as this user from now on.
  * @param string $user
  * @param string $password
- * @param ToolkitServiceCw [optional] $connection, the result of i5_connect(), or omit
+ * @param ToolkitServiceCw [optional] $connection, the result of i5_connect(), or
+ * omit
  * @return boolean  True on success, False on failure
  */
-function i5_adopt_authority($user, $password, $connection = null)
-{
-    // if conn not passed in, get instance of toolkit. If can't be obtained, return false.
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
+function i5_adopt_authority($user, $password, $connection = null) {
+	// if conn not passed in, get instance of toolkit. If can't be obtained, return
+	// false.
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-    // user/pw must be uppercase.
-    $user = strtoupper($user);
-    $password = strtoupper($password);
+	// user/pw must be uppercase.
+	$user = strtoupper($user);
+	$password = strtoupper($password);
 
-    
-    // check that username and password vars are OK.
-    // forbid QSECOFR and empty password (though special values such as *NOPWDCHK are OK) 
-    if ((strtoupper($user) == 'QSECOFR') || empty($password)) {
-        i5ErrorActivity(I5_ERR_WRONGLOGIN, I5_CAT_PHP, 'Bad login user or password', '');
-        return false;
-    } //(if QSECOFR) 
-    
-    // Get profile handle (checking u/p validity)
-    $apiPgm = 'QSYGETPH';
-    $apiLib = 'QSYS';
-    
-    $pwLen = strlen($password);
-    $pwCcsid = '-1'; // -1 means 37 or DFTCCSID depending on password level
-    
-    $paramXml = 
-    "<parm io='in' comment='1. user'>
+	// check that username and password vars are OK.
+	// forbid QSECOFR and empty password (though special values such as *NOPWDCHK are
+	// OK)
+	if ((strtoupper($user) == 'QSECOFR') || empty($password)) {
+		i5ErrorActivity(I5_ERR_WRONGLOGIN, I5_CAT_PHP, 'Bad login user or password', '');
+		return false;
+	}//(if QSECOFR)
+
+	// Get profile handle (checking u/p validity)
+	$apiPgm = 'QSYGETPH';
+	$apiLib = 'QSYS';
+
+	$pwLen = strlen($password);
+	$pwCcsid = '-1';
+	// -1 means 37 or DFTCCSID depending on password level
+
+	$paramXml = "<parm io='in' comment='1. user'>
       <data var='user' type='10A' varying='off'>$user</data>
     </parm>
     <parm io='in' comment='2. password'>
@@ -624,124 +639,123 @@ function i5_adopt_authority($user, $password, $connection = null)
     </parm>
     <parm io='out' comment='3. profile handle'>
       <data var='handleOut' type='12b' comment='really binary data not character' />
-    </parm>\n" .    
-    // param number 4
-    ToolkitServiceCw::getErrorDataStructXml(4) . "\n";
+    </parm>\n" .
+	// param number 4
+	ToolkitServiceCw::getErrorDataStructXml(4) . "\n";
 
-    if (substr($password, 0, 1) != '*') {
-    	/* No asterisk at the start, so this is an attempt at a real password, 
-    	 * not a special pw value starting with an asterisk such as *NOPWD, *NOPWDCHK, or *NOPWDSTS.
-    	 * Therefore, include pw len and CCSID, which must be omitted if pw is a special "*" value.
-    	 */
-    	 $paramXml .= 
-    "<parm io='both' comment='5. length of password. Must be equal to the actual pw length.	'>
+	if (substr($password, 0, 1) != '*') {
+		/* No asterisk at the start, so this is an attempt at a real password,
+		 * not a special pw value starting with an asterisk such as *NOPWD, *NOPWDCHK, or
+		 * *NOPWDSTS.
+		 * Therefore, include pw len and CCSID, which must be omitted if pw is a special
+		 * "*" value.
+		 */
+		$paramXml .= "<parm io='both' comment='5. length of password. Must be equal to the actual pw length.	'>
       <data var='pwLen' type='10i0'>$pwLen</data>
     </parm>
     <parm io='in' comment='6. CCSID of password'>
       <data var='pwCcsid' type='10i0'>$pwCcsid</data>
     </parm>";
-         	
-    } // (if (substr($password, 0, 1) != '*'))
-     
-  
-           
-    // In case of error, look for CPFs generated by specific other programs.
-    // E.g. if userid is wrong, program QSYPHDL may report the CPF in joblog
-    //$options = array('otherCpfPrograms' => array('QSYPHDL'));
-    
-    // now call the API!
-    $retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml, null);//, $options);
 
-    if($connection->getErrorCode()) {
-        i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
-        return false;
-    }
-       
-    // get handle from API we called.
-    if (isset($retPgmArr['io_param']['handleOut'])) {
-        $handle = $retPgmArr['io_param']['handleOut']; // handleOut defined in XML above
-    }
+	}// (if (substr($password, 0, 1) != '*'))
 
-    // if anything went wrong
-    if (!isset($handle) || empty($handle)) {
-    	i5ErrorActivity(I5_ERR_PHP_INTERNAL, I5_CAT_PHP, 'Unable to adopt authority. Check joblogs', '');
-    	return false;
-    }
-    
-    // now set the user profile via the handle.
-    $apiPgm = 'QWTSETP'; // set profile
-    $apiLib = 'QSYS';
-    
-    $paramXml = 
-        "<parm io='in' comment='profile handle'>
+	// In case of error, look for CPFs generated by specific other programs.
+	// E.g. if userid is wrong, program QSYPHDL may report the CPF in joblog
+	//$options = array('otherCpfPrograms' => array('QSYPHDL'));
+
+	// now call the API!
+	$retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml, null);
+	//, $options);
+
+	if ($connection->getErrorCode()) {
+		i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
+		return false;
+	}
+
+	// get handle from API we called.
+	if (isset($retPgmArr['io_param']['handleOut'])) {
+		$handle = $retPgmArr['io_param']['handleOut'];
+		// handleOut defined in XML above
+	}
+
+	// if anything went wrong
+	if (!isset($handle) || empty($handle)) {
+		i5ErrorActivity(I5_ERR_PHP_INTERNAL, I5_CAT_PHP, 'Unable to adopt authority. Check joblogs', '');
+		return false;
+	}
+
+	// now set the user profile via the handle.
+	$apiPgm = 'QWTSETP';
+	// set profile
+	$apiLib = 'QSYS';
+
+	$paramXml = "<parm io='in' comment='profile handle'>
             <data var='handleIn' type='12b'>$handle</data>
-         </parm>\n" .    
-        // error param is number 2
-        ToolkitServiceCw::getErrorDataStructXml(2);
-        
-    // now call the "set handle" API!
-    $retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
+         </parm>\n" .
+	// error param is number 2
+	ToolkitServiceCw::getErrorDataStructXml(2);
 
-    if($connection->getErrorCode()) {
-        i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
-        return false;
-    }
-    
-    // Now close/release the handle (tidiness--handles are limited resources, about 20,000 per job).
-    // Takes about .02 seconds to release handle.
-    // If too slow, could combine QWTSETP and QSYRLSPH in a single call,
-    // or call this API in *BATCH mode.
-    $apiPgm = 'QSYRLSPH'; // release profile handle
-    $apiLib = 'QSYS';
-    
-    $paramXml = 
-        "<parm io='in' comment='profile handle'>
+	// now call the "set handle" API!
+	$retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
+
+	if ($connection->getErrorCode()) {
+		i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
+		return false;
+	}
+
+	// Now close/release the handle (tidiness--handles are limited resources, about
+	// 20,000 per job).
+	// Takes about .02 seconds to release handle.
+	// If too slow, could combine QWTSETP and QSYRLSPH in a single call,
+	// or call this API in *BATCH mode.
+	$apiPgm = 'QSYRLSPH';
+	// release profile handle
+	$apiLib = 'QSYS';
+
+	$paramXml = "<parm io='in' comment='profile handle'>
             <data var='handleIn' type='12b'>$handle</data>
-         </parm>\n" .    
-        // error param is number 2
-        ToolkitServiceCw::getErrorDataStructXml(2);
-        
-    // now call the "release handle" API!
-    $retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
+         </parm>\n" .
+	// error param is number 2
+	ToolkitServiceCw::getErrorDataStructXml(2);
 
-    if($connection->getErrorCode()) {
-        i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
-        return false;
-    }
-    
-        
-    // from this point on, no CPFs will happen in this function.
-    noError();
-    
-    return true;
-    
-} //(i5_adopt_authority)
+	// now call the "release handle" API!
+	$retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
 
+	if ($connection->getErrorCode()) {
+		i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
+		return false;
+	}
+
+	// from this point on, no CPFs will happen in this function.
+	noError();
+
+	return true;
+
+}//(i5_adopt_authority)
 
 // ERROR handling
 
 /**
- * Get array of error information for most recent action. Both numeric and descriptive string indexes are provided.
+ * Get array of error information for most recent action. Both numeric and
+ * descriptive string indexes are provided.
  * Example:
- * [0] => 312                                                         
- * [1] => 9                                                           
- * [2] => CPF2292                                                     
- * [3] => *SECADM required to create or change user profiles.         
- * [num] => 312                                                       
- * [cat] => 9                                                         
- * [msg] => CPF2292                                                   
- * [desc] => *SECADM required to create or change user profiles.      
+ * [0] => 312
+ * [1] => 9
+ * [2] => CPF2292
+ * [3] => *SECADM required to create or change user profiles.
+ * [num] => 312
+ * [cat] => 9
+ * [msg] => CPF2292
+ * [desc] => *SECADM required to create or change user profiles.
  *
  * @return array Error info for most recent action. See above for example.
  * @param ToolkitServiceCw $connection Optional connection object (not used)
  */
-function i5_error($connection = null)
-{   
-    $errorObj = I5Error::getInstance();
-    return $errorObj->getI5Error();
-    
-} //(i5_error)
+function i5_error($connection = null) {
+	$errorObj = I5Error::getInstance();
+	return $errorObj->getI5Error();
 
+}//(i5_error)
 
 /**
  * Returns error number for most recent action.
@@ -749,15 +763,12 @@ function i5_error($connection = null)
  *                 Zero if no error
  * @param ToolkitServiceCw $connection Optional connection object
  */
-function i5_errno($connection = null)
-{
-    $errArray = i5_error($connection);
-    // return error number if it exists, otherwise an 'OK'.
-    return (isset($errArray['num'])) ? $errArray['num'] : I5_ERR_OK;
+function i5_errno($connection = null) {
+	$errArray = i5_error($connection);
+	// return error number if it exists, otherwise an 'OK'.
+	return (isset($errArray['num'])) ? $errArray['num'] : I5_ERR_OK;
 
-} //(i5_errno)
-
-
+}//(i5_errno)
 
 /**
  * Returns error message or code for most recent action.
@@ -766,164 +777,179 @@ function i5_errno($connection = null)
  *                 Blank if no error
  * @param ToolkitServiceCw $connection Optional connection object
  */
-function i5_errormsg($connection = null)
-{
-    $errArray = i5_error($connection);
-    // return error number if it exists, otherwise an 'OK'.
-    return (isset($errArray['msg'])) ? $errArray['msg'] : I5_ERR_OK;
-    
-} //(i5_errormsg)
+function i5_errormsg($connection = null) {
+	$errArray = i5_error($connection);
+	// return error number if it exists, otherwise an 'OK'.
+	return (isset($errArray['msg'])) ? $errArray['msg'] : I5_ERR_OK;
 
+}//(i5_errormsg)
 
 // Command
-
 
 /**
  * i5_command: Call a command with optional input/output parameters
  *             Can also call a program that has no parameters
- * @param string $cmdString Basic command that can contain parameters or not, as desired
+ * @param string $cmdString Basic command that can contain parameters or not, as
+ * desired
  * @param array $input Optional array of name => value pairs
- * The name describes the call input parameters. Names should match IBM i CL command parameter names.
+ * The name describes the call input parameters. Names should match IBM i CL
+ * command parameter names.
  * If the array is empty or not provided, no input parameters are given.
  * Strings are not quoted; this is the user's responsibility.
- * If the value is an array, the list of contained values is passed in a space-delimited string.
- * @param array $output   Optional information about how to get output from the command.
- *                            if value is a string, it's the name of PHP variable to receive the value.
+ * If the value is an array, the list of contained values is passed in a
+ * space-delimited string.
+ * @param array $output   Optional information about how to get output from the
+ * command.
+ *                            if value is a string, it's the name of PHP variable
+ * to receive the value.
  *                             example:  array('userlibl'=>'usrlibl')
- *                            if value is an array, it's in the form: array($varName, 'type')
- *                             examples: array('syslibl' => array('syslibl', 'char(165)'))
- *                                       array('ccsid'   => array('myccsid', 'dec(5 0)'))
- *                         Note: the old toolkit seemed to use the lengths (165), (5 0) but we will ignore lengths. "dec" is used, if present.
+ *                            if value is an array, it's in the form:
+ * array($varName, 'type')
+ *                             examples: array('syslibl' => array('syslibl',
+ * 'char(165)'))
+ *                                       array('ccsid'   => array('myccsid',
+ * 'dec(5 0)'))
+ *                         Note: the old toolkit seemed to use the lengths (165),
+ * (5 0) but we will ignore lengths. "dec" is used, if present.
  * @param ToolkitServiceCw $connection Optional connection object
  * @return boolean for success/failure
  */
 function i5_command($cmdString, $input = array(), $output = array(), $connection = null) {
 
-    // if conn not passed in, get instance of toolkit. If can't be obtained, return false.
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-        
-    // check that a string was passed in for command
-    if(!$cmdString) {
-        i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'missing password', 'missing password');
-        return false;
-    } elseif (!is_string($cmdString)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Command must be a string', 'Command must be a string');
-        return false;
-    } //(if not a string...)
-    
-    // start with string as passed in
-    $workCmdString = $cmdString;
-    
-    // Add input params, if any
-    if ($input && is_array($input) && count($input)) {
-        foreach ($input as $key=>$value) {
-            // if $value is itself an array, provide all values delimited by spaces.
-            if (is_array($value)) {
-                $valueStr = implode(" ", $value);
-            } else {
-                // just a string or integer
-                $valueStr = $value;
-            }
-            $workCmdString .= " $key($valueStr)";
-        } //(foreach input)
-    } //(if input array not empty)
-    
-    // were output parms requested?
-    $needOutputParms = ($output && is_array($output) && count($output));
-    
-    // Add output params, if any
-    if ($needOutputParms) {
-        
-        // build a simple array for re-connecting parms to vars at end of routine
-        $simpleParmVarArray = array();
-        
-        foreach ($output as $parmName=>$varDesc) {
-            /* $parmName: name of parameter for CL command.
-             * $varDesc:  if a string, it's the name of PHP variable to receive the value.
-             *                             example:  array('userlibl'=>'usrlibl')
-             *            if array, it's in the form: array($varName, 'type')
-             *                             examples: array('syslibl' => array('syslibl', 'char(165)'))
-             *                                       array('ccsid'   => array('myccsid', 'dec(5 0)'))
-             * Note: the old toolkit seemed to use the lengths (165), (5 0) but we will ignore lengths. "dec" is used, if present.
-             */                                   
-                      
-            $parmName = strtoupper($parmName);
-                                    
-            if (is_array($varDesc)) {
-                // deal with array (see second set of examples above)
-                $varDescCount = count($varDesc); 
-                if ($varDescCount == 1) {
-                	// working with alternate incorrect format array('syslibl'=>'char(165)')
-                	// from early versions of CWTEST.PHP. Honor it.
-                	$varName = key($varDesc);
-                    $typeString = $varDesc[$varName];
-                } elseif ($varDescCount == 2) {
-                	// correct format ('myccsid', 'dec(5 0)') or the like
-                	$varName = $varDesc[0]; // first 
-                	$typeString = $varDesc[1]; // second
-                } else {
-                	// truly invalid array
-           	        i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, "wrong array size for $parmName", "wrong array size for $parmName");
-           	        return false;
-                } //(if varDescCount...)
-                
-                // was 'dec' passed in
-                $isDecimalType = (false !== stripos($typeString, 'dec'));
-            } else {
-                // just a string
-                $varName = $varDesc;
-                $isDecimalType = false;    
-            } //(if is_array($varDesc)
-            
-            $simpleParmVarArray[$parmName] = $varName; // for later
+	// if conn not passed in, get instance of toolkit. If can't be obtained, return
+	// false.
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-            // XML wants an "N" if numeric
-            $questionString = ($isDecimalType) ? '?N' : '?';
-            $outputParmStr = "$parmName($questionString)"; // e.g. CCSID(?N)
-            
-            $workCmdString .= " $outputParmStr";
-        } //(foreach input)
-    } //(if $needOutputParms)
-    
+	// check that a string was passed in for command
+	if (!$cmdString) {
+		i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'missing password', 'missing password');
+		return false;
+	} elseif (!is_string($cmdString)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Command must be a string', 'Command must be a string');
+		return false;
+	}
+	//(if not a string...)
 
-    // we have our command string to use.
-    $finalCmdString = $workCmdString;
+	// start with string as passed in
+	$workCmdString = $cmdString;
 
-    // pass command string into non-fast (but result-returning) or fast (true/false only) method.
-    if ($needOutputParms) {
+	// Add input params, if any
+	if ($input && is_array($input) && count($input)) {
+		foreach ($input as $key => $value) {
+			// if $value is itself an array, provide all values delimited by spaces.
+			if (is_array($value)) {
+				$valueStr = implode(" ", $value);
+			} else {
+				// just a string or integer
+				$valueStr = $value;
+			}
+			$workCmdString .= " $key($valueStr)";
+		} //(foreach input)
+	}//(if input array not empty)
 
-    	// Use slower but improved "result" (REXX) technique
-        $result = $connection->ClCommandWithOutput($finalCmdString);
-        
-        if ($result) {
-        	
-        	// Command succeeded. Set and export output variables.
-            $exportedThem = $connection->setOutputVarsToExport($simpleParmVarArray, $result);
-        } else {
-        	// command failed; don't try to export its output variables.
-        	$exportedThem = false; 
-        } //(if $result)
+	// were output parms requested?
+	$needOutputParms = ($output && is_array($output) && count($output));
 
-    } else {
-        // do fast way without rows but with CPF error if available.
-        $result = $connection->ClCommandWithCpf($finalCmdString);
-        
-    } //$needOutputParms
-    
-    // if result is false consider it an error.
-    if(!$result){
-        // TODO if have a CPF, scour job log for msg.
-        i5CpfError($connection->getLastError(), "Error with CL Command");
-        return false;
-    } else {
-        noError();       
-        return true;    
-    } // (if not command)
-    
-    
-} //(i5_command)
+	// Add output params, if any
+	if ($needOutputParms) {
+
+		// build a simple array for re-connecting parms to vars at end of routine
+		$simpleParmVarArray = array();
+
+		foreach ($output as $parmName => $varDesc) {
+			/* $parmName: name of parameter for CL command.
+			 * $varDesc:  if a string, it's the name of PHP variable to receive the value.
+			 *                             example:  array('userlibl'=>'usrlibl')
+			 *            if array, it's in the form: array($varName, 'type')
+			 *                             examples: array('syslibl' => array('syslibl',
+			 * 'char(165)'))
+			 *                                       array('ccsid'   => array('myccsid',
+			 * 'dec(5 0)'))
+			 * Note: the old toolkit seemed to use the lengths (165), (5 0) but we will
+			 * ignore lengths. "dec" is used, if present.
+			 */
+
+			$parmName = strtoupper($parmName);
+
+			if (is_array($varDesc)) {
+				// deal with array (see second set of examples above)
+				$varDescCount = count($varDesc);
+				if ($varDescCount == 1) {
+					// working with alternate incorrect format array('syslibl'=>'char(165)')
+					// from early versions of CWTEST.PHP. Honor it.
+					$varName = key($varDesc);
+					$typeString = $varDesc[$varName];
+				} elseif ($varDescCount == 2) {
+					// correct format ('myccsid', 'dec(5 0)') or the like
+					$varName = $varDesc[0];
+					// first
+					$typeString = $varDesc[1];
+					// second
+				} else {
+					// truly invalid array
+					i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, "wrong array size for $parmName", "wrong array size for $parmName");
+					return false;
+				}
+				//(if varDescCount...)
+
+				// was 'dec' passed in
+				$isDecimalType = (false !== stripos($typeString, 'dec'));
+			} else {
+				// just a string
+				$varName = $varDesc;
+				$isDecimalType = false;
+			}//(if is_array($varDesc)
+
+			$simpleParmVarArray[$parmName] = $varName;
+			// for later
+
+			// XML wants an "N" if numeric
+			$questionString = ($isDecimalType) ? '?N' : '?';
+			$outputParmStr = "$parmName($questionString)";
+			// e.g. CCSID(?N)
+
+			$workCmdString .= " $outputParmStr";
+		} //(foreach input)
+	}//(if $needOutputParms)
+
+	// we have our command string to use.
+	$finalCmdString = $workCmdString;
+
+	// pass command string into non-fast (but result-returning) or fast (true/false
+	// only) method.
+	if ($needOutputParms) {
+
+		// Use slower but improved "result" (REXX) technique
+		$result = $connection->ClCommandWithOutput($finalCmdString);
+
+		if ($result) {
+
+			// Command succeeded. Set and export output variables.
+			$exportedThem = $connection->setOutputVarsToExport($simpleParmVarArray, $result);
+		} else {
+			// command failed; don't try to export its output variables.
+			$exportedThem = false;
+		} //(if $result)
+
+	} else {
+		// do fast way without rows but with CPF error if available.
+		$result = $connection->ClCommandWithCpf($finalCmdString);
+
+	}//$needOutputParms
+
+	// if result is false consider it an error.
+	if (!$result) {
+		// TODO if have a CPF, scour job log for msg.
+		i5CpfError($connection->getLastError(), "Error with CL Command");
+		return false;
+	} else {
+		noError();
+		return true;
+	} // (if not command)
+
+}//(i5_command)
 
 // return object or false
 /**
@@ -931,194 +957,195 @@ function i5_command($cmdString, $input = array(), $output = array(), $connection
  * @param string         $pgmName     Lib/Pgm or Pgm or Lib/Pgm(svcfunc)
  * @param array          $description Array of program parameter info
  * @param ServiceToolkit $connection  Optional toolkit object
- * @return DataDescription|boolean    On success, an object containing program definition information, or false on failure
+ * @return DataDescription|boolean    On success, an object containing program
+ * definition information, or false on failure
  */
 function i5_program_prepare($pgmName, $description, $connection = null) {
 
-    // if conn not passed in, get instance of toolkit. If can't be obtained, return false.
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-    
-    // look for params
-    if (!isset($pgmName)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing program name', 'Missing program name');
-        return false;
-    }
-    if (!is_string($pgmName)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Program name must be a string', 'Program name must be a string');
-        return false;
-    }
-    if (!isset($description)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing description', 'Missing description');
-        return false;
-    }
-    if (!is_array($description)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Description must be an array', 'Description must be an array');
-        return false;
-    }
-    
-    // use object that can transform and check description for us.
-    $descObj = new DataDescription($pgmName, $description, $connection);
+	// if conn not passed in, get instance of toolkit. If can't be obtained, return
+	// false.
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-    noError();
-    return $descObj;
-    
-    // validate description types and structure
-//    $correct = $descObj->validate();
-    
-    
-/*    if ($correct) {
-        // if OK, return the object itself for use in the program call.
-        return $descObj;
-    } else {    
-        // TODO get actual validation error and set it
-        return false;
-    }
-*/    
-} //(i5_program_prepare)
+	// look for params
+	if (!isset($pgmName)) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing program name', 'Missing program name');
+		return false;
+	}
+	if (!is_string($pgmName)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Program name must be a string', 'Program name must be a string');
+		return false;
+	}
+	if (!isset($description)) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing description', 'Missing description');
+		return false;
+	}
+	if (!is_array($description)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Description must be an array', 'Description must be an array');
+		return false;
+	}
+
+	// use object that can transform and check description for us.
+	$descObj = new DataDescription($pgmName, $description, $connection);
+
+	noError();
+	return $descObj;
+
+	// validate description types and structure
+	//    $correct = $descObj->validate();
+
+	/*    if ($correct) {
+	 // if OK, return the object itself for use in the program call.
+	 return $descObj;
+	 } else {
+	 // TODO get actual validation error and set it
+	 return false;
+	 }
+	 */
+}//(i5_program_prepare)
 
 /*Description: Opens a program PCML file and prepares it to be run.
-Return Values: Resource if open succeeded, false if open failed.
-Arguments:
-description - String of PCML with program and parameter information
-connection - Result of i5_connect
-*/
+ Return Values: Resource if open succeeded, false if open failed.
+ Arguments:
+ description - String of PCML with program and parameter information
+ connection - Result of i5_connect
+ */
 // return object or false
 function i5_program_prepare_PCML($description = null, $connection = null) {
-    /*i5ErrorActivity(TO_BE_IMPLEMENTED, 0, "To be implemented", "To be implemented");
-    return false;
-    */
-    // if conn not passed in, get instance of toolkit. If can't be obtained, return false.
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-    
-    // look for params
-    
-    // PCML should be a string
-    if (!isset($description)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing PCML string', 'Missing PCML string');
-        return false;
-    }
-    if (!is_string($description)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'PCML description must be a string', 'PCML description must be a string');
-        return false;
-    }
+	/*i5ErrorActivity(TO_BE_IMPLEMENTED, 0, "To be implemented", "To be
+	 * implemented");
+	 return false;
+	 */
+	// if conn not passed in, get instance of toolkit. If can't be obtained, return
+	// false.
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-    // use object that can transform and check description for us.
-    $descObj = new DataDescriptionPcml($description, $connection);
+	// look for params
 
-    noError();
-    
-    return $descObj;
-    
-    
-} //(i5_program_prepare_PCML)
+	// PCML should be a string
+	if (!isset($description)) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing PCML string', 'Missing PCML string');
+		return false;
+	}
+	if (!is_string($description)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'PCML description must be a string', 'PCML description must be a string');
+		return false;
+	}
 
+	// use object that can transform and check description for us.
+	$descObj = new DataDescriptionPcml($description, $connection);
+
+	noError();
+
+	return $descObj;
+
+}//(i5_program_prepare_PCML)
 
 /**
  * Call a program based on a prepare done before.
- * @param DataDescription $program   Program object created in the preparation stage.
- * @param array           $params    Input params with key=>value pairs (possibly nested),
- *                                   keys matching what was specified in prepare stage.
+ * @param DataDescription $program   Program object created in the preparation
+ * stage.
+ * @param array           $params    Input params with key=>value pairs (possibly
+ * nested),
+ *                                   keys matching what was specified in prepare
+ * stage.
  * @param array            $retvals  Output params (optional)
- *                                   Fields get created based on names of output parms.
+ *                                   Fields get created based on names of output
+ * parms.
  * @return boolean         True if successful, false if not.
  */
 function i5_program_call(DataDescription $program, $params, $retvals = array()) {
 
-    
-    // TODO check type of $program and give toolkit-like messages
-    $inputValues = $params;
-    // convert from old to new param format, inserting input values
-    $newInputParams = $program->generateNewToolkitParams($inputValues);
-    $success = $program->callProgram($newInputParams);
+	// TODO check type of $program and give toolkit-like messages
+	$inputValues = $params;
+	// convert from old to new param format, inserting input values
+	$newInputParams = $program->generateNewToolkitParams($inputValues);
+	$success = $program->callProgram($newInputParams);
 
-    if ($success) {
-        if ($retvals && is_array($retvals)) {
-            // TODO check that retvals is an array, etc.
-            $pgmOutput = $program->getPgmOutput();
-            $exportedThem = $program->getConnection()->setOutputVarsToExport($retvals, $pgmOutput);
-            //$exportedThem = exportPgmOutputVars($retvals, $pgmOutput);
-            if (!$exportedThem) {
-                return false;
-            }
-            
-        } //(retvals present)
-        
-        noError();
-        return true;
-    } else {
-        // TODO if particular xml errors,
-        // such as errnoxml = 1000005 or errnoile = 3025 means can't find program,
-        // specify them.
+	if ($success) {
+		if ($retvals && is_array($retvals)) {
+			// TODO check that retvals is an array, etc.
+			$pgmOutput = $program->getPgmOutput();
+			$exportedThem = $program->getConnection()->setOutputVarsToExport($retvals, $pgmOutput);
+			//$exportedThem = exportPgmOutputVars($retvals, $pgmOutput);
+			if (!$exportedThem) {
+				return false;
+			}
 
-    	// Return "toolkit-style" CPF errno codes/messages
-        // Set the i5error object based on this.
-        $conn = $program->getConnection();
-    	if($conn->getErrorCode()) {
-            i5CpfError($conn->getErrorCode(), $conn->getErrorMsg());
-            return false;
-        } //(if error code found)
-    	
-        return false;
-    }// (if success)
-} //(i5_program_call)
-    
-    
-// do NOT need ReturnValue unless func returns values as function return, which the old toolkit doesn't seem to support.
+		}//(retvals present)
 
+		noError();
+		return true;
+	} else {
+		// TODO if particular xml errors,
+		// such as errnoxml = 1000005 or errnoile = 3025 means can't find program,
+		// specify them.
+
+		// Return "toolkit-style" CPF errno codes/messages
+		// Set the i5error object based on this.
+		$conn = $program->getConnection();
+		if ($conn->getErrorCode()) {
+			i5CpfError($conn->getErrorCode(), $conn->getErrorMsg());
+			return false;
+		}//(if error code found)
+
+		return false;
+	}// (if success)
+}//(i5_program_call)
+
+// do NOT need ReturnValue unless func returns values as function return, which
+// the old toolkit doesn't seem to support.
 
 // pass in pgm object. no return value
 function i5_program_close(&$pgm) {
-     
-    // Not much to do here. Set program object to null.
-    $pgm = null;
-    
-    noError();
-    return true;
-} //(i5_program_close)
 
+	// Not much to do here. Set program object to null.
+	$pgm = null;
+
+	noError();
+	return true;
+}//(i5_program_close)
 
 // return string or false
 function i5_get_system_value($name, $connection = null) {
-    
-    if (!$connection = verifyConnection($connection)) {
-        // still no good for some reason
-        return false;
-    }
-    
-    if (!$name) {
-        i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Name is required.', 'Name is required.');
-        return false;
-    }
-    $obj = new SystemValues( $connection );
-    $sysval = $obj->GetSystemValue($name);
-    
-    if (!$sysval) {
-        // something went wrong, or was invalid name
-        $cpf = 'Bad CPF happened here.';//$connection->getCPFErr();
-        i5CpfError($cpf, $connection->getLastError());
-        return false;
-    }
-    
-    // success
-    noError();
-    return $sysval;
-    
-} //(i5_get_system_value)
 
+	if (!$connection = verifyConnection($connection)) {
+		// still no good for some reason
+		return false;
+	}
 
+	if (!$name) {
+		i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Name is required.', 'Name is required.');
+		return false;
+	}
+	$obj = new SystemValues($connection);
+	$sysval = $obj->GetSystemValue($name);
+
+	if (!$sysval) {
+		// something went wrong, or was invalid name
+		$cpf = 'Bad CPF happened here.';
+		//$connection->getCPFErr();
+		i5CpfError($cpf, $connection->getLastError());
+		return false;
+	}
+
+	// success
+	noError();
+	return $sysval;
+
+}//(i5_get_system_value)
 
 // for internal use
 // $fieldInfo is an array with array indexes 'var', 'type', 'comment'
 function joblogRepeatingFieldXml($fieldInfo) {
-    
-    $xml = '';
-    
-    foreach ($fieldInfo as $oneField) {
-        $xml .= "<ds var='repeatingFieldInfo' comment='Repeating fields that define the fields we received and contain the data'>
+
+	$xml = '';
+
+	foreach ($fieldInfo as $oneField) {
+		$xml .= "<ds var='repeatingFieldInfo' comment='Repeating fields that define the fields we received and contain the data'>
         <data var='offsetToData' type='10i0' comment='Offset to the next field information returned' />
         <data var='fieldInfoLength' type='10i0' comment='Length of field information returned' />
         <data var='key' type='10i0' comment='Identifier field (key)' />
@@ -1129,228 +1156,242 @@ function joblogRepeatingFieldXml($fieldInfo) {
         <data var='{$oneField['var']}' type='{$oneField['type']}' comment='{$oneField['comment']}' />
         <data var='reserved2' type='{$oneField['reservedLen']}b' comment='Reserved' />
       </ds>";
-           
-    } //(foreach)
-    
-    return $xml;
-    
-} //(joblogRepeatingFieldXml($fieldInfo))
-         
 
+	}//(foreach)
+
+	return $xml;
+
+}//(joblogRepeatingFieldXml($fieldInfo))
 
 /*
  * Job Log Constants (i5_jobLog_list) array elements constants
-I5_LOBJ_MESSAGE_SEVERITY
-I5_LOBJ_MESSAGE_IDENTIFIER
-I5_LOBJ_MESSAGE_FILELIBRARY
-I5_LOBJ_TIMESENT_MICRO
-I5_LOBJ_MESSAGE_TYPE
-I5_LOBJ_DATASENT
-I5_LOBJ_MESSAGE_FILENAME
-I5_LOBJ_TIMESENT
-I5_LOBJ_ALERTOPT
-I5_LOBJ_MSGDTA
-I5_LOBJ_MSGHLPDTAFMT
-I5_LOBJ_SNDTYPE
-I5_LOBJ_SNDPROC
-I5_LOBJ_RCVMOD
-I5_LOBJ_PROBLEMID
-I5_LOBJ_RQSLVL
-I5_LOBJ_RPLDATA1
-I5_LOBJ_MSGHLP
-I5_LOBJ_DFTRPLY
-I5_LOBJ_SNDPGM
-I5_LOBJ_RCVTYPE
-I5_LOBJ_RCVPROC
-I5_LOBJ_RPLYSTS
-I5_LOBJ_TXTCCSID
-I5_LOBJ_MSG
-I5_LOBJ_MSGHLPDTA
-I5_LOBJ_SNDNAME
-I5_LOBJ_SNDMOD
-I5_LOBJ_RCVPROG
-I5_LOBJ_MSGFILE
-I5_LOBJ_RQSSTS
-I5_LOBJ_DATACCSID
-*/
-
+ I5_LOBJ_MESSAGE_SEVERITY
+ I5_LOBJ_MESSAGE_IDENTIFIER
+ I5_LOBJ_MESSAGE_FILELIBRARY
+ I5_LOBJ_TIMESENT_MICRO
+ I5_LOBJ_MESSAGE_TYPE
+ I5_LOBJ_DATASENT
+ I5_LOBJ_MESSAGE_FILENAME
+ I5_LOBJ_TIMESENT
+ I5_LOBJ_ALERTOPT
+ I5_LOBJ_MSGDTA
+ I5_LOBJ_MSGHLPDTAFMT
+ I5_LOBJ_SNDTYPE
+ I5_LOBJ_SNDPROC
+ I5_LOBJ_RCVMOD
+ I5_LOBJ_PROBLEMID
+ I5_LOBJ_RQSLVL
+ I5_LOBJ_RPLDATA1
+ I5_LOBJ_MSGHLP
+ I5_LOBJ_DFTRPLY
+ I5_LOBJ_SNDPGM
+ I5_LOBJ_RCVTYPE
+ I5_LOBJ_RCVPROC
+ I5_LOBJ_RPLYSTS
+ I5_LOBJ_TXTCCSID
+ I5_LOBJ_MSG
+ I5_LOBJ_MSGHLPDTA
+ I5_LOBJ_SNDNAME
+ I5_LOBJ_SNDMOD
+ I5_LOBJ_RCVPROG
+ I5_LOBJ_MSGFILE
+ I5_LOBJ_RQSSTS
+ I5_LOBJ_DATACCSID
+ */
 
 /*
  * Description: Opens job log.
  *
  * Gets a job log for a SPECIFIC JOB.
  *
-Return Values: The resource for fetching job log list if OK; false if failed.
-Arguments:
+ Return Values: The resource for fetching job log list if OK; false if failed.
+ Arguments:
  elements - JobName, JobUser, JobNumber, (default is current job)
-            MaxMessage (which does NOTHING in old toolkit. Ignored completely.), Direction
+ MaxMessage (which does NOTHING in old toolkit. Ignored completely.), Direction
  connection - Result of i5_connect
-Use i5_jobLog_list_read function to retrieve the job entries from this handle.
-/*
+ Use i5_jobLog_list_read function to retrieve the job entries from this handle.
+ /*
  * define('I5_JOBNAME', 'jobName');
-define('I5_USERNAME', 'username');
-define('I5_JOBNUMBER', 'jobnumber');
-define('I5_MAXMESSAGE', 'maxMessage'); // tested this in old toolkit. it's ignored--does nothing in old toolkit.
-The maximum number of messages to be returned. (-1 means all)
-define('I5_DIRECTION', 'direction');
-The direction to list messages. You must use one of these directions:
-*NEXT     Returns messages that are newer than the message specified by the starting message key field.
-*PRV     Returns messages that are older than the messages specified by the starting message key field.
+ define('I5_USERNAME', 'username');
+ define('I5_JOBNUMBER', 'jobnumber');
+ define('I5_MAXMESSAGE', 'maxMessage'); // tested this in old toolkit. it's
+ignored--does nothing in old toolkit.
+ The maximum number of messages to be returned. (-1 means all)
+ define('I5_DIRECTION', 'direction');
+ The direction to list messages. You must use one of these directions:
+ *NEXT     Returns messages that are newer than the message specified by the
+ * starting message key field.
+ *PRV     Returns messages that are older than the messages specified by the
+ * starting message key field.
 
-See http://publib.boulder.ibm.com/infocenter/iseries/v5r4/index.jsp?topic=%2Fapis%2FQMHLJOBL.htm
-API: QMHLJOBL (List job log messages)
+ See
+http://publib.boulder.ibm.com/infocenter/iseries/v5r4/index.jsp?topic=%2Fapis%2FQMHLJOBL.htm
+ API: QMHLJOBL (List job log messages)
 
-old toolkit enforced this rule:
-either all three are blank (current job), or all three must be supplied.
-if some are blank, get:
-CPF3658, job name not specified: Either job name 'A10A' is blank, user name 'ASEIDEN' is blank, or job number '' is blank.  None of these fields can contain blank
-With one exception: if only username is supplied, and the others are blank, ignore the username and provide current job's log.
-(That's what i5 toolkit does)
+ old toolkit enforced this rule:
+ either all three are blank (current job), or all three must be supplied.
+ if some are blank, get:
+ CPF3658, job name not specified: Either job name 'A10A' is blank, user name
+'ASEIDEN' is blank, or job number '' is blank.  None of these fields can contain
+blank
+ With one exception: if only username is supplied, and the others are blank,
+ignore the username and provide current job's log.
+ (That's what i5 toolkit does)
  *
  */
-function i5_jobLog_list($elements = array() , $connection = null)
-{
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-   
-    // check that if element criteria were passed, it's an array (though the array itself is optional)
-    if($elements && !is_array($elements)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Criteria elements must be an array', 'Criteria elements must be an array');
-        return false;
-    }
-    // if none are specified, make it *CURRENT
-    $jobName = '';
-    $jobUser = '';
-    $jobNumber = '';
-    $direction = '*NEXT'; // default
-    if (count($elements)) {
-        foreach ($elements as $type=>$value) {
-            switch ($type) {
-                case I5_JOBNAME:
-                    $jobName = $value;
-                    break;
-                case I5_JOBNUMBER:
-                    $jobNumber = $value;
-                    break;
-                case I5_USERNAME:
-                    $jobUser = $value;
-                    break;
-                case I5_DIRECTION:
-                    $direction = $value; //'L' or 'N', perhaps. or *NEXT, *PRV
-                    break;
-            }
-        }
-    } //(if count ($elements))
-    
-    // the way the old toolkit workd: if job# and job name are missing, get current job.
-    // (In that situation, user is ignored)
-    
-    if(empty($jobNumber) && empty($jobName)) {
-        list($jobName, $jobNumber, $jobUser) = array_fill(0, 3, '*');
-    }
+function i5_jobLog_list($elements = array(), $connection = null) {
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-    // now, ALL THREE should be filled one way or another.
-    // If one is missing, it's an error
-    if(empty($jobName) || empty($jobNumber) || empty($jobUser)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'All three criteria elements must be filled (or all left blank for current job)', 'All three criteria elements must be filled (or all left blank for current job)');
-        return false;
-    }
+	// check that if element criteria were passed, it's an array (though the array
+	// itself is optional)
+	if ($elements && !is_array($elements)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Criteria elements must be an array', 'Criteria elements must be an array');
+		return false;
+	}
+	// if none are specified, make it *CURRENT
+	$jobName = '';
+	$jobUser = '';
+	$jobNumber = '';
+	$direction = '*NEXT';
+	// default
+	if (count($elements)) {
+		foreach ($elements as $type => $value) {
+			switch ($type) {
+				case I5_JOBNAME:
+					$jobName = $value;
+					break;
+				case I5_JOBNUMBER:
+					$jobNumber = $value;
+					break;
+				case I5_USERNAME:
+					$jobUser = $value;
+					break;
+				case I5_DIRECTION:
+					$direction = $value;
+					//'L' or 'N', perhaps. or *NEXT, *PRV
+					break;
+			}
+		}
+	}//(if count ($elements))
 
+	// the way the old toolkit workd: if job# and job name are missing, get current
+	// job.
+	// (In that situation, user is ignored)
 
-        // if jobname or jobnumber is provided then complete job info (all three params) must be provided.
-    // otherwise give an I5_ERR_PHP_LIST_PROP error.
-    // In other words,
-    // (Not documented but shown in old toolkit unit tests.)
-    $specifyJobParams = false;
-    if (!empty($jobName) || !empty($jobNumber)) {
-        // jobName or jobNumber is specified. Must have all three job params.
-        if (empty($jobName) || empty($jobNumber) || empty($jobUser)) {
-            i5ErrorActivity(I5_ERR_PHP_LIST_PROP, I5_CAT_PHP, 'Incomplete job criteria specified.', 'If jobname or jobnumber are specified, then all three job criteria (jobname, jobnumber, and username) must be specified. You can use * to indicate current job.');
-            return false;
-        }
-        
-        // if we didn't error out then we have all three job params.
-        $specifyJobParams = true;
-        
-    } //(jobName or jobNumber given)
-       
-    $apiPgm = 'QGYOLJBL'; /// job log list
-    $apiLib = 'QSYS';
-    
-    $lengthOfReceiverVariable = 512; // list entry API will have a receiver DS of this length
-    
-    $outputVarname = 'listinfo';
-/*  <parm io='in' comment='7. Qualified job name. Pass blank to ignore.'>
-    <ds var='qualifiedJobName' comment='Qualified job name, total length 26'>
-     <data var='jobName' type='10a' comment='Job name'>$jobName</data>
-     <data var='userName' type='10a' comment='User name'>$jobUserName</data>
-     <data var='jobNumber' type='6a' comment='Job number'>$jobNumber</data>
-    </ds>
-  </parm>
-*/
-    // make sure these are STRINGS so that they aren't interpreted as octal.
-    
-    // TODO request all keys once overlay/offset/alpha convert is worked out for this complex API.
-//    $keysToRequest = array(0101, 0201, 0301, 0302, 0401, 0402, 0403, 0404, 0501, 0601, 0602, 0603, 0604, 0605, 0607, 0702, 0703, 0704, 0705, 0801, 0901, 1001, 1101, 1201, 1301, 1302, 1303, 1304);
-    $keysToRequest = array('0101');
+	if (empty($jobNumber) && empty($jobName)) {
+		list($jobName, $jobNumber, $jobUser) = array_fill(0, 3, '*');
+	}
 
-    $fieldInfoToRequest = array(
-         array('var'=>'0101', 'type'=>'9a', 'comment'=>'Alert option', 'reservedLen'=>7),
-         // 0201 could be 298a or more!
-         //array('var'=>'0201', 'type'=>'100b', 'comment'=>'Replacement data or impromptu message text', 'reservedLen'=>7)
-         );
-    
-    $fieldInfoToRequest = array();
+	// now, ALL THREE should be filled one way or another.
+	// If one is missing, it's an error
+	if (empty($jobName) || empty($jobNumber) || empty($jobUser)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'All three criteria elements must be filled (or all left blank for current job)', 'All three criteria elements must be filled (or all left blank for current job)');
+		return false;
+	}
 
-    $repeatingXml = joblogRepeatingFieldXml($fieldInfoToRequest);        
-    
-    $keysToRequestXml = '';
-    foreach ($keysToRequest as $keyToRequest) {
-        $keysToRequestXml .= "<data type='10i0'>$keyToRequest</data>\n";
-    }
-    $bytesFromHeaderBeforeKeys = 80;
-    $keysToRequest = count($keysToRequest);
-    $bytesFromKeys = $keysToRequest * 4;
-    $offsetToMsgqField = $bytesFromHeaderBeforeKeys + $bytesFromKeys;  
-    $sizeOfMessageInfo = $offsetToMsgqField + 1;
-    
-        /*<data type='10i0'>0101</data>
-        <data type='10i0'>0201</data>
-        <data type='10i0'>0301</data>
-        <data type='10i0'>0302</data>
-        <data type='10i0'>0401</data>
-        <data type='10i0'>0402</data>
-        <data type='10i0'>0403</data>
-        <data type='10i0'>0404</data>
-        <data type='10i0'>0501</data>
-        <data type='10i0'>0601</data>
-        <data type='10i0'>0602</data>
-        <data type='10i0'>0603</data>
-        <data type='10i0'>0604</data>
-        <data type='10i0'>0605</data>
-        <data type='10i0'>0607</data>
-        <data type='10i0'>0702</data>
-        <data type='10i0'>0703</data>
-        <data type='10i0'>0704</data>
-        <data type='10i0'>0705</data>
-        <data type='10i0'>0801</data>
-        <data type='10i0'>0901</data>
-        <data type='10i0'>1001</data>
-        <data type='10i0'>1101</data>
-        <data type='10i0'>1201</data>
-        <data type='10i0'>1301</data>
-        <data type='10i0'>1302</data>
-        <data type='10i0'>1303</data>
-        <data type='10i0'>1304</data>
-   */
-   
-    $paramXml =
-    $connection->getDummyReceiverAndLengthApiXml(1, $lengthOfReceiverVariable) . "\n" .
-   // param #3, list info
-  $connection->getListInfoApiXml(3) . "\n" .
-  $connection->getNumberOfRecordsDesiredApiXml(4) . "\n" .
-  "<parm io='in' comment='5. Message selection information' >
+	// if jobname or jobnumber is provided then complete job info (all three params)
+	// must be provided.
+	// otherwise give an I5_ERR_PHP_LIST_PROP error.
+	// In other words,
+	// (Not documented but shown in old toolkit unit tests.)
+	$specifyJobParams = false;
+	if (!empty($jobName) || !empty($jobNumber)) {
+		// jobName or jobNumber is specified. Must have all three job params.
+		if (empty($jobName) || empty($jobNumber) || empty($jobUser)) {
+			i5ErrorActivity(I5_ERR_PHP_LIST_PROP, I5_CAT_PHP, 'Incomplete job criteria specified.', 'If jobname or jobnumber are specified, then all three job criteria (jobname, jobnumber, and username) must be specified. You can use * to indicate current job.');
+			return false;
+		}
+
+		// if we didn't error out then we have all three job params.
+		$specifyJobParams = true;
+
+	}//(jobName or jobNumber given)
+
+	$apiPgm = 'QGYOLJBL';
+	/// job log list
+	$apiLib = 'QSYS';
+
+	$lengthOfReceiverVariable = 512;
+	// list entry API will have a receiver DS of this length
+
+	$outputVarname = 'listinfo';
+	/*  <parm io='in' comment='7. Qualified job name. Pass blank to ignore.'>
+	 <ds var='qualifiedJobName' comment='Qualified job name, total length 26'>
+	 <data var='jobName' type='10a' comment='Job name'>$jobName</data>
+	 <data var='userName' type='10a' comment='User name'>$jobUserName</data>
+	 <data var='jobNumber' type='6a' comment='Job number'>$jobNumber</data>
+	 </ds>
+	 </parm>
+	 */
+	// make sure these are STRINGS so that they aren't interpreted as octal.
+
+	// TODO request all keys once overlay/offset/alpha convert is worked out for this
+	// complex API.
+	//    $keysToRequest = array(0101, 0201, 0301, 0302, 0401, 0402, 0403, 0404,
+	// 0501, 0601, 0602, 0603, 0604, 0605, 0607, 0702, 0703, 0704, 0705, 0801, 0901,
+	// 1001, 1101, 1201, 1301, 1302, 1303, 1304);
+	$keysToRequest = array('0101');
+
+	$fieldInfoToRequest = array( array(
+			'var' => '0101',
+			'type' => '9a',
+			'comment' => 'Alert option',
+			'reservedLen' => 7
+		),
+		// 0201 could be 298a or more!
+		//array('var'=>'0201', 'type'=>'100b', 'comment'=>'Replacement data or impromptu
+		// message text', 'reservedLen'=>7)
+	);
+
+	$fieldInfoToRequest = array();
+
+	$repeatingXml = joblogRepeatingFieldXml($fieldInfoToRequest);
+
+	$keysToRequestXml = '';
+	foreach ($keysToRequest as $keyToRequest) {
+		$keysToRequestXml .= "<data type='10i0'>$keyToRequest</data>\n";
+	}
+	$bytesFromHeaderBeforeKeys = 80;
+	$keysToRequest = count($keysToRequest);
+	$bytesFromKeys = $keysToRequest * 4;
+	$offsetToMsgqField = $bytesFromHeaderBeforeKeys + $bytesFromKeys;
+	$sizeOfMessageInfo = $offsetToMsgqField + 1;
+
+	/*<data type='10i0'>0101</data>
+	 <data type='10i0'>0201</data>
+	 <data type='10i0'>0301</data>
+	 <data type='10i0'>0302</data>
+	 <data type='10i0'>0401</data>
+	 <data type='10i0'>0402</data>
+	 <data type='10i0'>0403</data>
+	 <data type='10i0'>0404</data>
+	 <data type='10i0'>0501</data>
+	 <data type='10i0'>0601</data>
+	 <data type='10i0'>0602</data>
+	 <data type='10i0'>0603</data>
+	 <data type='10i0'>0604</data>
+	 <data type='10i0'>0605</data>
+	 <data type='10i0'>0607</data>
+	 <data type='10i0'>0702</data>
+	 <data type='10i0'>0703</data>
+	 <data type='10i0'>0704</data>
+	 <data type='10i0'>0705</data>
+	 <data type='10i0'>0801</data>
+	 <data type='10i0'>0901</data>
+	 <data type='10i0'>1001</data>
+	 <data type='10i0'>1101</data>
+	 <data type='10i0'>1201</data>
+	 <data type='10i0'>1301</data>
+	 <data type='10i0'>1302</data>
+	 <data type='10i0'>1303</data>
+	 <data type='10i0'>1304</data>
+	 */
+
+	$paramXml = $connection->getDummyReceiverAndLengthApiXml(1, $lengthOfReceiverVariable) . "\n" .
+	// param #3, list info
+	$connection->getListInfoApiXml(3) . "\n" . $connection->getNumberOfRecordsDesiredApiXml(4) . "\n" . "<parm io='in' comment='5. Message selection information' >
     <ds var='msgSelectInfo' comment='Message selection information format'>
       <data type='10a' comment='List direction (*NEXT or *PRV)'>$direction</data>
       <ds var='qualifiedJobName' comment='Qualified job name, total length 26'>
@@ -1374,29 +1415,29 @@ function i5_jobLog_list($elements = array() , $connection = null)
   </parm>
   <parm io='in' comment='6. Size of message selection information (minimum 85, probably 193)'>
       <data type='10i0' var='sizeOfMsgSelectInfo'>$sizeOfMessageInfo</data>
-  </parm>\n" .    
-   // param number 7
-   ToolkitServiceCw::getErrorDataStructXml(7);
-         
-    // now call it!
-    // pass param xml directly in.
-        $retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
+  </parm>\n" .
+	// param number 7
+	ToolkitServiceCw::getErrorDataStructXml(7);
 
-        if($connection->getErrorCode()) {
-            i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
-            return false;
-        }
-        
-        
-        $retArr = $retPgmArr['io_param']['listinfo']; // 'listinfo' defined in getListInfoApiXml()
-        
-        $totalRecords = $retArr['totalRecords'];
-        $requestHandle = $retArr['requestHandle'];
-        $listStatus = $retArr['listStatus']; // in case we need it
+	// now call it!
+	// pass param xml directly in.
+	$retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
 
-        
-    // receiver data we want to see
-    $receiverDs = "
+	if ($connection->getErrorCode()) {
+		i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
+		return false;
+	}
+
+	$retArr = $retPgmArr['io_param']['listinfo'];
+	// 'listinfo' defined in getListInfoApiXml()
+
+	$totalRecords = $retArr['totalRecords'];
+	$requestHandle = $retArr['requestHandle'];
+	$listStatus = $retArr['listStatus'];
+	// in case we need it
+
+	// receiver data we want to see
+	$receiverDs = "
 <data type='10i0' comment='Offset to the next entry (but we are only getting one entry at a time)' />
 <data type='10i0' comment='Offset to fields returned' />
 <data type='10i0' comment='Number of fields returned (should be 28)' />
@@ -1410,213 +1451,213 @@ function i5_jobLog_list($elements = array() , $connection = null)
 <data var='7' type='6a' comment='Time sent' />
 <data var='8' type='6a' comment='Microseconds' />
 <data var='threadId' type='8b' comment='Thread ID' />
-<data var='reserved' type='4b' comment='Reserved with length 4 perfect' />\n" .
-$repeatingXml;
- 
-    // from this point on, no CPFs will happen in this function.
-    noError();
+<data var='reserved' type='4b' comment='Reserved with length 4 perfect' />\n" . $repeatingXml;
 
-    // make request for objects, but don't return any yet.
-    // Get a handle and total number of records.
-    // listinfo: totalRecords, firstRecordNumber, requestHandle. if firstRec... < totalRecords then can continue.
-    // return I5_ERR_BEOF when went past last record. get CPF GUI0006 when used invalid record#.
-    $listObj = new ListFromApi($requestHandle, $totalRecords, $receiverDs, $lengthOfReceiverVariable, $connection);
-    return $listObj;
-    
-    // if get false, check current job for CPF2441, which means "not authorized to job log."          
-        
-    //CPF2441 not authorized to display job log
-    
-} //(i5_joblog_list)
+	// from this point on, no CPFs will happen in this function.
+	noError();
 
+	// make request for objects, but don't return any yet.
+	// Get a handle and total number of records.
+	// listinfo: totalRecords, firstRecordNumber, requestHandle. if firstRec... <
+	// totalRecords then can continue.
+	// return I5_ERR_BEOF when went past last record. get CPF GUI0006 when used
+	// invalid record#.
+	$listObj = new ListFromApi($requestHandle, $totalRecords, $receiverDs, $lengthOfReceiverVariable, $connection);
+	return $listObj;
+
+	// if get false, check current job for CPF2441, which means "not authorized to
+	// job log."
+
+	//CPF2441 not authorized to display job log
+
+}//(i5_joblog_list)
 
 /*
  *
  * Description: Get an array for a job log entry.
  Return Values: Array with the message element if OK, false if failed.
  Arguments: list - Resource returned by i5_jobLog_list function
- 
- I5_USERNAME=>'QSYS'
-define('I5_JOBNAME', 'jobName');
-define('I5_USERNAME', 'username');
-define('I5_JOBNUMBER', 'jobnumber');
-define('I5_MAXMESSAGE', 'maxMessage');
-define('I5_DIRECTION', 'direction');
-define('I5_USERDATA', 'userdata');
-define('I5_OUTQ', 'outq');
-define('I5_STATUS', 'status');
-define('I5_JOBTYPE', 'jobType');
 
-LOGS LOGS LOGS LOGS
+ I5_USERNAME=>'QSYS'
+ define('I5_JOBNAME', 'jobName');
+ define('I5_USERNAME', 'username');
+ define('I5_JOBNUMBER', 'jobnumber');
+ define('I5_MAXMESSAGE', 'maxMessage');
+ define('I5_DIRECTION', 'direction');
+ define('I5_USERDATA', 'userdata');
+ define('I5_OUTQ', 'outq');
+ define('I5_STATUS', 'status');
+ define('I5_JOBTYPE', 'jobType');
+
+ LOGS LOGS LOGS LOGS
 
  */
 // pass list by reference so its current element can be advanced
-function i5_jobLog_list_read(&$list = null)
-{
-    return listRead($list);    
-    
-/* output all this stuff
- *  echo " - ".$data[I5_LOBJ_MSGDTA]."<BR>";
+function i5_jobLog_list_read(&$list = null) {
+	return listRead($list);
 
-   if (isset($data[I5_LOBJ_MSGHLP]))
+	/* output all this stuff
+	 *  echo " - ".$data[I5_LOBJ_MSGDTA]."<BR>";
 
-    echo $data[I5_LOBJ_MSGHLP]."<BR>";
- */
-} //(i5_joblog_list_read)
+	 if (isset($data[I5_LOBJ_MSGHLP]))
+
+	 echo $data[I5_LOBJ_MSGHLP]."<BR>";
+	 */
+}//(i5_joblog_list_read)
 
 /*
  * Description: Close handle received from i5_jobLog_list().
-Return Values: Boolean success value
-Arguments: list - Job list handle as returned by i5_jobLog_list(), passed by reference so it can be closed
+ Return Values: Boolean success value
+ Arguments: list - Job list handle as returned by i5_jobLog_list(), passed by
+reference so it can be closed
  */
-function i5_jobLog_list_close(&$list = null)
-{
-   return listClose($list);   
-    
-} //(i5_joblog_list_close)
+function i5_jobLog_list_close(&$list = null) {
+	return listClose($list);
 
-// Check that we have an instance of the toolkit object, either passed in or available from the toolkit.
+}//(i5_joblog_list_close)
+
+// Check that we have an instance of the toolkit object, either passed in or
+// available from the toolkit.
 // Return that instance, or false.
 function verifyConnection($connection = null) {
-    // if conn passed but it's bad
-    if ($connection && !is_a($connection, 'ToolkitService')) {
-        i5ErrorActivity(I5_ERR_PHP_HDLCONN, I5_CAT_PHP, 'Connection handle invalid', 'Connection handle invalid');
-        return false;
-        
-    } elseif (!$connection) {
-        // not passed in.
-    	
-        // Check if a connection was started. User should start a connection before trying to use it.
-        if (!ToolkitServiceCw::hasInstance()) {
+	// if conn passed but it's bad
+	if ($connection && !is_a($connection, 'ToolkitService')) {
+		i5ErrorActivity(I5_ERR_PHP_HDLCONN, I5_CAT_PHP, 'Connection handle invalid', 'Connection handle invalid');
+		return false;
 
-        	i5ErrorActivity(I5_ERR_PHP_HDLDFT, I5_CAT_PHP, 'No default connection found.', 'Connection has not been initialized. Please connect before using this function.');
-        	return false;
-        } 
-        
-        // if we thought we had a connection but it's empty.
-        if (!$connection = ToolkitServiceCw::getInstance()) {
-        	// still no good for some reason
-        	i5ErrorActivity(I5_ERR_PHP_HDLCONN, I5_CAT_PHP, 'Connection handle invalid', 'Connection handle invalid');
-        	return false;
-        }
-    } //(verify connection)
-    
-    // A good connection. Return it.
-    return $connection;
-} //(verifyConnection)
+	} elseif (!$connection) {
+		// not passed in.
 
+		// Check if a connection was started. User should start a connection before
+		// trying to use it.
+		if (!ToolkitServiceCw::hasInstance()) {
+
+			i5ErrorActivity(I5_ERR_PHP_HDLDFT, I5_CAT_PHP, 'No default connection found.', 'Connection has not been initialized. Please connect before using this function.');
+			return false;
+		}
+
+		// if we thought we had a connection but it's empty.
+		if (!$connection = ToolkitServiceCw::getInstance()) {
+			// still no good for some reason
+			i5ErrorActivity(I5_ERR_PHP_HDLCONN, I5_CAT_PHP, 'Connection handle invalid', 'Connection handle invalid');
+			return false;
+		}
+	}
+	//(verify connection)
+
+	// A good connection. Return it.
+	return $connection;
+}//(verifyConnection)
 
 // split but, unlike Zend PHP wrapper, keep original indexes.
-function splitJobStringIntoArray($JobListString)
-    {            
-        // fill jobList with one array entry per job,
-        // but break up each job into separate fields.
-        $jobList = array();
-        if(is_array($JobListString)){
-            foreach($JobListString as $element)
-            {
-                $el = str_split( $element, 10);
-                $jobList[] = $el;
-            }
-        }
-        return $jobList;
-    }
-    
-
+function splitJobStringIntoArray($JobListString) {
+	// fill jobList with one array entry per job,
+	// but break up each job into separate fields.
+	$jobList = array();
+	if (is_array($JobListString)) {
+		foreach ($JobListString as $element) {
+			$el = str_split($element, 10);
+			$jobList[] = $el;
+		}
+	}
+	return $jobList;
+}
 
 // Active jobs
 /*
  * Description: Open active job list.
-Return Values: The resource for fetching job list if OK and false if failed.
-An empty list is considered successful.
-Arguments:
- elements - JobName, JobUser, JobNumber (*ALL is OK for these), JobType, (default is current job)
+ Return Values: The resource for fetching job list if OK and false if failed.
+ An empty list is considered successful.
+ Arguments:
+ elements - JobName, JobUser, JobNumber (*ALL is OK for these), JobType, (default
+is current job)
  Direction (I don't think Direction is correct)
  connection - Result of i5_connect
- 
-  I5_USERNAME=>'QSYS'
-define('I5_JOBNAME', 'jobName');
-define('I5_USERNAME', 'username');
-define('I5_JOBNUMBER', 'jobnumber');
-define('I5_MAXMESSAGE', 'maxMessage');
-define('I5_DIRECTION', 'direction');
-define('I5_USERDATA', 'userdata');
-define('I5_OUTQ', 'outq');
-define('I5_STATUS', 'status');
-define('I5_JOBTYPE', 'jobType'); (actually status)
 
-job type
-*     This value lists all job types.
-A     The job is an autostart job.
-B     The job is a batch job.
-I     The job is an interactive job.
-M     The job is a subsystem monitor job.
-R     The job is a spooled reader job.
-S     The job is a system job.
-W     The job is a spooled writer job.
-X     The job is the start-control-program-function (SCPF) system job.
+ I5_USERNAME=>'QSYS'
+ define('I5_JOBNAME', 'jobName');
+ define('I5_USERNAME', 'username');
+ define('I5_JOBNUMBER', 'jobnumber');
+ define('I5_MAXMESSAGE', 'maxMessage');
+ define('I5_DIRECTION', 'direction');
+ define('I5_USERDATA', 'userdata');
+ define('I5_OUTQ', 'outq');
+ define('I5_STATUS', 'status');
+ define('I5_JOBTYPE', 'jobType'); (actually status)
+
+ job type
+ *     This value lists all job types.
+ A     The job is an autostart job.
+ B     The job is a batch job.
+ I     The job is an interactive job.
+ M     The job is a subsystem monitor job.
+ R     The job is a spooled reader job.
+ S     The job is a system job.
+ W     The job is a spooled writer job.
+ X     The job is the start-control-program-function (SCPF) system job.
 
  */
-function i5_job_list($elements = array(), $connection = null)
-{
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-    
-    // check that if element criteria were passed, it's an array (though the array itself is optional)
-    if($elements && !is_array($elements)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Criteria elements must be an array', 'Criteria elements must be an array');
-        return false;
-    }
-    
-    $jobName = '';
-    $jobUser = '';
-    $jobNumber = '';
-    $jobType = '*'; // default to all types
-    
-    if (count($elements)) {
-        foreach ($elements as $type=>$value) {
-            switch ($type) {
-                case I5_JOBNAME:
-                    $jobName = $value;
-                    break;
-                case I5_JOBNUMBER:
-                    $jobNumber = $value;
-                    break;
-                case I5_USERNAME:
-                    $jobUser = $value;
-                    break;
-                case I5_JOBTYPE:
-                    $jobType = $value;
-                    break;
-            }
-        }
-    } //(if count(elements))
-    
-    // if NONE of name/user/number are specified, assume it's the current job.
-    // Specify the current job with "*" for job name, and a blank user and number.
-    if(empty($jobName) && empty($jobUser) && empty($jobNumber)) {
-        $jobName = '*';
-    } else {
-        // something was specified. Set any non-specified fields to "*ALL".
-        $jobName = ($jobName) ? $jobName : '*ALL';
-        $jobUser = ($jobUser) ? $jobUser : '*ALL';
-        $jobNumber = ($jobNumber) ? $jobNumber : '*ALL';
-    }
+function i5_job_list($elements = array(), $connection = null) {
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-    
-    
-    // the job lister doesn't have any error messages.
-    i5ErrorActivity(I5_ERR_OK);    
-    
-    $apiPgm = 'QGYOLJOB'; /// object list
-    $apiLib = 'QSYS';
-    
-    $lengthOfReceiverVariable = 1164; // list entry API will have a receiver DS of this length
-    
-    $outputVarname = 'listinfo';
-    
-    $paramXml = "
+	// check that if element criteria were passed, it's an array (though the array
+	// itself is optional)
+	if ($elements && !is_array($elements)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Criteria elements must be an array', 'Criteria elements must be an array');
+		return false;
+	}
+
+	$jobName = '';
+	$jobUser = '';
+	$jobNumber = '';
+	$jobType = '*';
+	// default to all types
+
+	if (count($elements)) {
+		foreach ($elements as $type => $value) {
+			switch ($type) {
+				case I5_JOBNAME:
+					$jobName = $value;
+					break;
+				case I5_JOBNUMBER:
+					$jobNumber = $value;
+					break;
+				case I5_USERNAME:
+					$jobUser = $value;
+					break;
+				case I5_JOBTYPE:
+					$jobType = $value;
+					break;
+			}
+		}
+	}//(if count(elements))
+
+	// if NONE of name/user/number are specified, assume it's the current job.
+	// Specify the current job with "*" for job name, and a blank user and number.
+	if (empty($jobName) && empty($jobUser) && empty($jobNumber)) {
+		$jobName = '*';
+	} else {
+		// something was specified. Set any non-specified fields to "*ALL".
+		$jobName = ($jobName) ? $jobName : '*ALL';
+		$jobUser = ($jobUser) ? $jobUser : '*ALL';
+		$jobNumber = ($jobNumber) ? $jobNumber : '*ALL';
+	}
+
+	// the job lister doesn't have any error messages.
+	i5ErrorActivity(I5_ERR_OK);
+
+	$apiPgm = 'QGYOLJOB';
+	/// object list
+	$apiLib = 'QSYS';
+
+	$lengthOfReceiverVariable = 1164;
+	// list entry API will have a receiver DS of this length
+
+	$outputVarname = 'listinfo';
+
+	$paramXml = "
   <parm io='out' comment='1. receiver. do not receive anything here. Wait till Get List Entry'>
     <ds var='receiver' comment='length $lengthOfReceiverVariable'>
         <data type='1h' comment='dummy. Real receiver will be gotten in list entry API call' />
@@ -1644,9 +1685,7 @@ function i5_job_list($elements = array(), $connection = null)
 
   <parm io='in' comment='5. Length of receiver variable definition information'>
     <data var='receiverDefinitionLength' comment='104 fields (from #101 to #2102) x 20 bytes + 4 header is 2084' type='10i0' setlen='receiverDefinition' />
-  </parm>\n" .
-  $connection->getListInfoApiXml(6) . "\n" .
-  "<parm io='in' comment='7. Number of records to return. Use zero to offload to Get List Entries API'>
+  </parm>\n" . $connection->getListInfoApiXml(6) . "\n" . "<parm io='in' comment='7. Number of records to return. Use zero to offload to Get List Entries API'>
     <data var='numRecsDesired' type='10i0'>0</data>
   </parm>
   <parm io='in' comment='8. Sort information' >
@@ -1792,27 +1831,29 @@ function i5_job_list($elements = array(), $connection = null)
       <data type='10i0'>2101</data>
       <data type='10i0'>2102</data>
     </ds>
-  </parm>\n" .  ToolkitServiceCw::getErrorDataStructXml(13); // param number 13
-    
-    // now call it!
-    // pass param xml directly in.
-        $retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
+  </parm>\n" . ToolkitServiceCw::getErrorDataStructXml(13);
+	// param number 13
 
-        if($connection->getErrorCode()) {
-            // TODO get real message from joblog
-            i5ErrorActivity(I5_ERR_PHP_AS400_MESSAGE, I5_CAT_PHP, $connection->getErrorCode(), $connection->getErrorMsg());
-            return false;
-        }
-        
-        $retArr = $retPgmArr['io_param']['listinfo']; // 'listinfo' defined in getListInfoApiXml()
-        //d($retArr);
-        $totalRecords = $retArr['totalRecords'];
-        $requestHandle = $retArr['requestHandle'];
-        $listStatus = $retArr['listStatus']; // in case we need it
+	// now call it!
+	// pass param xml directly in.
+	$retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
 
-        
-    // receiver data we want to see
-    $receiverDs = "
+	if ($connection->getErrorCode()) {
+		// TODO get real message from joblog
+		i5ErrorActivity(I5_ERR_PHP_AS400_MESSAGE, I5_CAT_PHP, $connection->getErrorCode(), $connection->getErrorMsg());
+		return false;
+	}
+
+	$retArr = $retPgmArr['io_param']['listinfo'];
+	// 'listinfo' defined in getListInfoApiXml()
+	//d($retArr);
+	$totalRecords = $retArr['totalRecords'];
+	$requestHandle = $retArr['requestHandle'];
+	$listStatus = $retArr['listStatus'];
+	// in case we need it
+
+	// receiver data we want to see
+	$receiverDs = "
       <data var='1' type='10a' comment='Job name used' />
       <data var='2' type='10a' comment='User name used' />
       <data var='3' type='6a' comment='Job number used' />
@@ -1929,234 +1970,234 @@ function i5_job_list($elements = array(), $connection = null)
       <data var='2102' type='10i0' comment='User return code' />
         ";
 
-    // from this point on, no CPFs will happen in this function.
-    noError();
-    
-    // make request for objects, but don't return any yet.
-    // Get a handle and total number of records.
-    // listinfo: totalRecords, firstRecordNumber, requestHandle. if firstRec... < totalRecords then can continue.
-    // return I5_ERR_BEOF when went past last record. get CPF GUI0006 when used invalid record#.
-    $listObj = new ListFromApi($requestHandle, $totalRecords, $receiverDs, $lengthOfReceiverVariable, $connection);
-    return $listObj;
-        
-} //(i5_job_list)
+	// from this point on, no CPFs will happen in this function.
+	noError();
+
+	// make request for objects, but don't return any yet.
+	// Get a handle and total number of records.
+	// listinfo: totalRecords, firstRecordNumber, requestHandle. if firstRec... <
+	// totalRecords then can continue.
+	// return I5_ERR_BEOF when went past last record. get CPF GUI0006 when used
+	// invalid record#.
+	$listObj = new ListFromApi($requestHandle, $totalRecords, $receiverDs, $lengthOfReceiverVariable, $connection);
+	return $listObj;
+
+}//(i5_job_list)
 
 /*
  * Description: Get an array for an active job entry.
  Return Values: Array with the job entry element if OK, false if failed.
  Arguments: List - Resource returned by i5_job_list function
  */
-function i5_job_list_read(&$list = null)
-{
-    return listRead($list);
-    
-} //(i5_job_list_read)
+function i5_job_list_read(&$list = null) {
+	return listRead($list);
+
+}//(i5_job_list_read)
 
 /*
- * Description: Close handle received from i5_job_list(). Return Values: Boolean success value
+ * Description: Close handle received from i5_job_list(). Return Values: Boolean
+ * success value
  * Arguments:  list- Job list handle as returned by 15_job_list()
  */
-function i5_job_list_close(&$list= null)
-{
-    return listClose($list);
-        
-} //(i5_job_list_close)
+function i5_job_list_close(&$list = null) {
+	return listClose($list);
 
+}//(i5_job_list_close)
 
-// TODO get better error codes even though a service program is used. Try job log.
+// TODO get better error codes even though a service program is used. Try job
+// log.
 
 /**
  * Creates data area
  * @param string $name      Lib/Name of data area to create (lib is optional)
- * @param int $size         Size in bytes    
+ * @param int $size         Size in bytes
  * @param ToolkitServiceCw $connection
  * @return boolean          True if successful, false if not.
  */
 function i5_data_area_create($name, $size, $connection = null) {
- 
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-        
-    if (!$name) {
-        i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Name is required.', 'Name is required.');
-        return false;
-    }
-    if (!$size) {
-        i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Size is required.', 'Size is required.');
-        return false;
-    }
-    
-    // error if size is not numeric
-    if (!is_int($size) && !ctype_digit($size)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Size must be an integer.', 'Size must be an integer.');
-        return false;
-    }
-    // params OK at this point
-    
-    // Split library (use *CURLIB if no library specified) and program names
-    $libAndObj = splitLibObj($name, '*CURLIB');
-    
-    $dataAreaObj = new DataArea($connection);
-    try {
-        $dataAreaObj->createDataArea($libAndObj['obj'], $libAndObj['lib'], $size);
-    } catch (Exception $e) {
-        i5CpfError('Error creating data area', $e->getMessage());
-        return false;
-    }
-    
-    return true;
-    
-} //(i5_data_area_create)
 
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
+
+	if (!$name) {
+		i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Name is required.', 'Name is required.');
+		return false;
+	}
+	if (!$size) {
+		i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Size is required.', 'Size is required.');
+		return false;
+	}
+
+	// error if size is not numeric
+	if (!is_int($size) && !ctype_digit($size)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Size must be an integer.', 'Size must be an integer.');
+		return false;
+	}
+	// params OK at this point
+
+	// Split library (use *CURLIB if no library specified) and program names
+	$libAndObj = splitLibObj($name, '*CURLIB');
+
+	$dataAreaObj = new DataArea($connection);
+	try {
+		$dataAreaObj->createDataArea($libAndObj['obj'], $libAndObj['lib'], $size);
+	} catch (Exception $e) {
+		i5CpfError('Error creating data area', $e->getMessage());
+		return false;
+	}
+
+	return true;
+
+}//(i5_data_area_create)
 
 /**
  * Reads data from data area. Offset and length can be optional together.
  * @param string $name                               Name of data area
- * @param int|ToolkitServiceCw $offsetOrConnection   Offset to read from (omit to read all) OR connection    
- * @param int $length                                Length of data to read (-1 means all)
+ * @param int|ToolkitServiceCw $offsetOrConnection   Offset to read from (omit to
+ * read all) OR connection
+ * @param int $length                                Length of data to read (-1
+ * means all)
  * @param ToolkitServiceCw $connection
- * @return string|boolean   Returns data if read successful, false if read failed (including when offset is wrong)
+ * @return string|boolean   Returns data if read successful, false if read failed
+ * (including when offset is wrong)
  */
-function i5_data_area_read($name, $offsetOrConnection = null, $length = null, $connection = null)
-{
-    
-    if (is_numeric($length)){
-        // not null
-        // assume offset and length are both provided, since they come as a pair.
-        $offset = $offsetOrConnection;
-    } else {
-        // length unspecified. Assume offset isn't, either.
-        $offset = null;
-        $length = null;
-        $connection = $offsetOrConnection;
-    }
-    
-    
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-        
-    if (!$name) {
-        i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Name is required.', 'Name is required.');
-        return false;
-    }
+function i5_data_area_read($name, $offsetOrConnection = null, $length = null, $connection = null) {
 
-    // error if offset or length are not numeric
-    if ($offset && !is_int($offset) && !ctype_digit($offset)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Offset must be an integer.', 'Offset must be an integer.');
-        return false;
-    }
-    if ($length && !is_int($length) && !ctype_digit($length)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Length must be an integer.', 'Length must be an integer.');
-        return false;
-    }
-    
-    
-    // params OK at this point
+	if (is_numeric($length)) {
+		// not null
+		// assume offset and length are both provided, since they come as a pair.
+		$offset = $offsetOrConnection;
+	} else {
+		// length unspecified. Assume offset isn't, either.
+		$offset = null;
+		$length = null;
+		$connection = $offsetOrConnection;
+	}
 
-    // adjust length for "all"
-    $lengthToUse = $length;
-    if (!$length || ($length <= 0)) {
-    	// length not provided or 0 or -1: use *ALL
-    	$lengthToUse = '*ALL';
-    } //(length absent or <= 0)
-    
-    
-    // If a library (optional--slash delimited), separate it.
-    // use *LIBL if no library specified
-    $name = strtoupper($name);
-    $libAndObj = splitLibObj($name, '*LIBL');     
-    
-    try {
-        	$dataAreaObj = new DataArea($connection);
-            $dataAreaObj->setDataAreaName($libAndObj['obj'], $libAndObj['lib']);
-        	
-            $value = $dataAreaObj->readDataArea($offset, $lengthToUse);
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-    } catch (Exception $e) {
-        i5CpfError('Error reading from data area', $e->getMessage());
-        return false;
-    }
-    
-    if ($value) {
-        return $value;
-    } else {
-        i5CpfError('Could not read from data area.', $dataAreaObj->getError());
-        return false;
-    }
-    
-} //(i5_data_area_read)
+	if (!$name) {
+		i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Name is required.', 'Name is required.');
+		return false;
+	}
 
+	// error if offset or length are not numeric
+	if ($offset && !is_int($offset) && !ctype_digit($offset)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Offset must be an integer.', 'Offset must be an integer.');
+		return false;
+	}
+	if ($length && !is_int($length) && !ctype_digit($length)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Length must be an integer.', 'Length must be an integer.');
+		return false;
+	}
+
+	// params OK at this point
+
+	// adjust length for "all"
+	$lengthToUse = $length;
+	if (!$length || ($length <= 0)) {
+		// length not provided or 0 or -1: use *ALL
+		$lengthToUse = '*ALL';
+	}//(length absent or <= 0)
+
+	// If a library (optional--slash delimited), separate it.
+	// use *LIBL if no library specified
+	$name = strtoupper($name);
+	$libAndObj = splitLibObj($name, '*LIBL');
+
+	try {
+		$dataAreaObj = new DataArea($connection);
+		$dataAreaObj->setDataAreaName($libAndObj['obj'], $libAndObj['lib']);
+
+		$value = $dataAreaObj->readDataArea($offset, $lengthToUse);
+
+	} catch (Exception $e) {
+		i5CpfError('Error reading from data area', $e->getMessage());
+		return false;
+	}
+
+	if ($value) {
+		return $value;
+	} else {
+		i5CpfError('Could not read from data area.', $dataAreaObj->getError());
+		return false;
+	}
+
+}//(i5_data_area_read)
 
 /**
- * Writes data to data area. Offset and length can be specified together, as a pair, or not at all.
+ * Writes data to data area. Offset and length can be specified together, as a
+ * pair, or not at all.
  * @param string $name      Name of data area
- * @param string $value     Data to write    
- * @param int|ToolkitServiceCw $offsetOrConnection   Offset a which to write data (omit to start from beginning) OR connection
- * @param int $length       Length of data to write. "If value is shorter than length it is padded to the length. If it's longer it is truncated."
+ * @param string $value     Data to write
+ * @param int|ToolkitServiceCw $offsetOrConnection   Offset a which to write data
+ * (omit to start from beginning) OR connection
+ * @param int $length       Length of data to write. "If value is shorter than
+ * length it is padded to the length. If it's longer it is truncated."
  * @param ToolkitServiceCw $connection
  * @return boolean          True on success, false on failure
  */
-function i5_data_area_write($name, $value, $offsetOrConnection = null, $length = null, $connection = null)
-{
-    if (isset($length)) {
-        // assume offset and length are both provided, since they come as a pair.
-         $offset = $offsetOrConnection;
-    } else {
-        // length unspecified. Assume offset isn't, either.
-        $offset = null;
-        $connection = $offsetOrConnection;
-    }
-    
-    
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-        
-    if (!$name) {
-        i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Name is required.', 'Name is required.');
-        return false;
-    }
+function i5_data_area_write($name, $value, $offsetOrConnection = null, $length = null, $connection = null) {
+	if (isset($length)) {
+		// assume offset and length are both provided, since they come as a pair.
+		$offset = $offsetOrConnection;
+	} else {
+		// length unspecified. Assume offset isn't, either.
+		$offset = null;
+		$connection = $offsetOrConnection;
+	}
 
-    if (!$value) {
-        i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Value is required.', 'Value is required.');
-        return false;
-    }
-    
-    // error if offset or length are not numeric
-    if ($offset && !is_int($offset) && !ctype_digit($offset)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Offset must be an integer.', 'Offset must be an integer.');
-        return false;
-    }
-    if ($length && !is_int($length) && !ctype_digit($length)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Length must be an integer.', 'Length must be an integer.');
-        return false;
-    }
-    
-    // params OK at this point
-    
-    // if the value isn't surrounded by single quotes, do it, to avoid an error if embedded spaces are present).
-    // (This could be left up to users, but it's easy for us to do. See how this goes.)
-    $value = "'" . trim($value, "'") . "'";        
-    
-    // Split library (use *LIBL if no library specified) and program names
-    $name = strtoupper($name);
-    $libAndObj = splitLibObj($name, '*LIBL');
-    
-    $dataAreaObj = new DataArea($connection);
-    $dataAreaObj->setDataAreaName($libAndObj['obj'], $libAndObj['lib']);
-    try {
-        $dataAreaObj->writeDataArea($value, $offset, $length);
-    } catch (Exception $e) {
-        i5CpfError('Error writing to data area', $e->getMessage());
-        return false;
-    }
-    
-    return true;
-    
-} //(i5_data_area_write)
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
+	if (!$name) {
+		i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Name is required.', 'Name is required.');
+		return false;
+	}
+
+	if (!$value) {
+		i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Value is required.', 'Value is required.');
+		return false;
+	}
+
+	// error if offset or length are not numeric
+	if ($offset && !is_int($offset) && !ctype_digit($offset)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Offset must be an integer.', 'Offset must be an integer.');
+		return false;
+	}
+	if ($length && !is_int($length) && !ctype_digit($length)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Length must be an integer.', 'Length must be an integer.');
+		return false;
+	}
+
+	// params OK at this point
+
+	// if the value isn't surrounded by single quotes, do it, to avoid an error if
+	// embedded spaces are present).
+	// (This could be left up to users, but it's easy for us to do. See how this
+	// goes.)
+	$value = "'" . trim($value, "'") . "'";
+
+	// Split library (use *LIBL if no library specified) and program names
+	$name = strtoupper($name);
+	$libAndObj = splitLibObj($name, '*LIBL');
+
+	$dataAreaObj = new DataArea($connection);
+	$dataAreaObj->setDataAreaName($libAndObj['obj'], $libAndObj['lib']);
+	try {
+		$dataAreaObj->writeDataArea($value, $offset, $length);
+	} catch (Exception $e) {
+		i5CpfError('Error writing to data area', $e->getMessage());
+		return false;
+	}
+
+	return true;
+
+}//(i5_data_area_write)
 
 /**
  * Deletes data area
@@ -2164,157 +2205,156 @@ function i5_data_area_write($name, $value, $offsetOrConnection = null, $length =
  * @param ToolkitServiceCw $connection
  * @return boolean          True if successful, false if not.
  */
-function i5_data_area_delete($name, $connection = null)
-{
-  	if (!$connection = verifyConnection($connection)) {
-        // still no good for some reason
-        return false;
-    }
-    
-    if (!$name) {
-        i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Name is required.', 'Name is required.');
-        return false;
-    }
-    
-    // params OK at this point
-    
-    // Split library (use *LIBL if no library specified) and program names
-    $libAndObj = splitLibObj($name, '*LIBL');
-        
-    $dataAreaObj = new DataArea($connection);
-    try {
-        $dataAreaObj->deleteDataArea($libAndObj['obj'], $libAndObj['lib']);
-    } catch (Exception $e) {
-        i5CpfError('Error deleting data area', $e->getMessage());
-        return false;
-    }
-    
-    return true;
-    
-} //(i5_data_area_delete)
+function i5_data_area_delete($name, $connection = null) {
+	if (!$connection = verifyConnection($connection)) {
+		// still no good for some reason
+		return false;
+	}
 
+	if (!$name) {
+		i5ErrorActivity(I5_ERR_PHP_NBPARAM_BAD, I5_CAT_PHP, 'Name is required.', 'Name is required.');
+		return false;
+	}
+
+	// params OK at this point
+
+	// Split library (use *LIBL if no library specified) and program names
+	$libAndObj = splitLibObj($name, '*LIBL');
+
+	$dataAreaObj = new DataArea($connection);
+	try {
+		$dataAreaObj->deleteDataArea($libAndObj['obj'], $libAndObj['lib']);
+	} catch (Exception $e) {
+		i5CpfError('Error deleting data area', $e->getMessage());
+		return false;
+	}
+
+	return true;
+
+}//(i5_data_area_delete)
 
 // spool files
 
-/*Description: Create an spool file lists, of certain output queue or for all queues.
+/*Description: Create an spool file lists, of certain output queue or for all
+ * queues.
  Return Values: resource if OK, false if failed
  Arguments:
- description - The data by which the sppol files will be filtered, array with following keys:
+ description - The data by which the sppol files will be filtered, array with
+following keys:
  username - username that created the job
- UNDOCUMENTED: jobnumber, jobname, too!!!!! but if specify jobname, must specify all three (name, number, user)
-      "*" for all three will give current job.
-  outq - qualified (optional library included) name for the output queue containing the spool file
+ UNDOCUMENTED: jobnumber, jobname, too!!!!! but if specify jobname, must specify
+all three (name, number, user)
+ "*" for all three will give current job.
+ outq - qualified (optional library included) name for the output queue
+containing the spool file
  userdata - the user-supplied key data for the spool file.
  All keys are optional and can be provided together
  connection - result of i5_connect.
-*/
-function i5_spool_list($description = array(), $connection = null)
-{
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-    
+ */
+function i5_spool_list($description = array(), $connection = null) {
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-    // check that criteria description is an array (OK if empty)
-    if($description && !is_array($description)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Criteria elements must be an array', 'Criteria elements must be an array');
-        return false;
-    }
-    
-    $userData = '';
-    $outq = '';
-    $userName = '';
-    $jobUserName = '';
-    $jobName = '';
-    $jobNumber = '';
+	// check that criteria description is an array (OK if empty)
+	if ($description && !is_array($description)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Criteria elements must be an array', 'Criteria elements must be an array');
+		return false;
+	}
 
-    // use constants:
-    //I5_USERDATA, I5_OUTQ, I5_USERNAME    
-    
-    if (count($description)) {
-        foreach ($description as $type=>$value) {
-            switch ($type) {
-                case I5_USERDATA:
-                    $userData = $value;
-                    break;
-                case I5_OUTQ:
-                    $outq = $value;
-                    break;
-                case I5_USERNAME:
-                    $userName = $value;
-                    $jobUserName = $value;
-                    break;
-                case I5_JOBNAME:
-                    $jobName = $value;
-                    break;
-                case I5_JOBNUMBER:
-                    $jobNumber = $value;
-                    break;
-            }
-        }
-    } //(if count($description))
-    
-    
-    // if jobname or jobnumber is provided then complete job info (all three params) must be provided.
-    // otherwise give an I5_ERR_PHP_LIST_PROP error.
-    // In other words,
-    // (Not documented but shown in old toolkit unit tests.)
-    $specifyJobParams = false;
-    if (!empty($jobName) || !empty($jobNumber)) {
-        // jobName or jobNumber is specified. Must have all three job params.
-        if (empty($jobName) || empty($jobNumber) || empty($jobUserName)) {
-            i5ErrorActivity(I5_ERR_PHP_LIST_PROP, I5_CAT_PHP, 'Incomplete job criteria specified.', 'If jobname or jobnumber are specified, then all three job criteria (jobname, jobnumber, and username) must be specified. You can use * to indicate current job.');
-            return false;
-        }
-        
-        // if we didn't error out then we have all three job params.
-        $specifyJobParams = true;
-        
-    } //(jobName or jobNumber given)
-    
-    // if we're not specifying complete job info, pass all three of those parms as blank.
-    if (!$specifyJobParams) {
-        $jobName = '';
-        $jobNumber = '';
-        $jobUserName = '';
-    } //(if specifyJobParams)
-    
-    // Set any non-specified fields to "*ALL".
-    $userData = ($userData) ? $userData : '*ALL';
-    $outq = ($outq) ? $outq : '*ALL';
-    $userName = ($userName) ? $userName : '*ALL';
-           
-    // split up outq in case a library was specified
-    $outqName = '';
-    $outqLibName = '';
-    // if an outq was specified but it's not *ALL
-    if ($outq) {
-        $objInfo = splitLibObj(strtoupper($outq)); // IBM i objects are usually upper case
-        $outqName = $objInfo['obj'];
-        $outqLibName = $objInfo['lib'];
-        // if outq is not *ALL, it should have a library name
-        if (($outq != '*ALL') && empty($outqLibName)) {
-            // if no libname, result set will be empty, so might as well alert the user.
-            i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing outq library', 'You specified an outq but did not qualify it with a library name.');
-            return false;
-        }
-    } //(if $outq)
-    
-    
-    $apiPgm = 'QGYOLSPL'; /// spool file list
-    $apiLib = 'QSYS';
-    
-    $lengthOfReceiverVariable = 136; // list entry API will have a receiver DS of this length
-    
-    $outputVarname = 'listinfo';
+	$userData = '';
+	$outq = '';
+	$userName = '';
+	$jobUserName = '';
+	$jobName = '';
+	$jobNumber = '';
 
-    $paramXml =
-    $connection->getDummyReceiverAndLengthApiXml(1, $lengthOfReceiverVariable) . "\n" .
-   // param #3, list info
-  $connection->getListInfoApiXml(3) . "\n" .
-  $connection->getNumberOfRecordsDesiredApiXml(4) . "\n" .
-  $connection->getSortInformationApiXml(5) . "\n" .
-  "<parm io='in' comment='6. Filter information' >
+	// use constants:
+	//I5_USERDATA, I5_OUTQ, I5_USERNAME
+
+	if (count($description)) {
+		foreach ($description as $type => $value) {
+			switch ($type) {
+				case I5_USERDATA:
+					$userData = $value;
+					break;
+				case I5_OUTQ:
+					$outq = $value;
+					break;
+				case I5_USERNAME:
+					$userName = $value;
+					$jobUserName = $value;
+					break;
+				case I5_JOBNAME:
+					$jobName = $value;
+					break;
+				case I5_JOBNUMBER:
+					$jobNumber = $value;
+					break;
+			}
+		}
+	}//(if count($description))
+
+	// if jobname or jobnumber is provided then complete job info (all three params)
+	// must be provided.
+	// otherwise give an I5_ERR_PHP_LIST_PROP error.
+	// In other words,
+	// (Not documented but shown in old toolkit unit tests.)
+	$specifyJobParams = false;
+	if (!empty($jobName) || !empty($jobNumber)) {
+		// jobName or jobNumber is specified. Must have all three job params.
+		if (empty($jobName) || empty($jobNumber) || empty($jobUserName)) {
+			i5ErrorActivity(I5_ERR_PHP_LIST_PROP, I5_CAT_PHP, 'Incomplete job criteria specified.', 'If jobname or jobnumber are specified, then all three job criteria (jobname, jobnumber, and username) must be specified. You can use * to indicate current job.');
+			return false;
+		}
+
+		// if we didn't error out then we have all three job params.
+		$specifyJobParams = true;
+
+	}//(jobName or jobNumber given)
+
+	// if we're not specifying complete job info, pass all three of those parms as
+	// blank.
+	if (!$specifyJobParams) {
+		$jobName = '';
+		$jobNumber = '';
+		$jobUserName = '';
+	}//(if specifyJobParams)
+
+	// Set any non-specified fields to "*ALL".
+	$userData = ($userData) ? $userData : '*ALL';
+	$outq = ($outq) ? $outq : '*ALL';
+	$userName = ($userName) ? $userName : '*ALL';
+
+	// split up outq in case a library was specified
+	$outqName = '';
+	$outqLibName = '';
+	// if an outq was specified but it's not *ALL
+	if ($outq) {
+		$objInfo = splitLibObj(strtoupper($outq));
+		// IBM i objects are usually upper case
+		$outqName = $objInfo['obj'];
+		$outqLibName = $objInfo['lib'];
+		// if outq is not *ALL, it should have a library name
+		if (($outq != '*ALL') && empty($outqLibName)) {
+			// if no libname, result set will be empty, so might as well alert the user.
+			i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing outq library', 'You specified an outq but did not qualify it with a library name.');
+			return false;
+		}
+	}//(if $outq)
+
+	$apiPgm = 'QGYOLSPL';
+	/// spool file list
+	$apiLib = 'QSYS';
+
+	$lengthOfReceiverVariable = 136;
+	// list entry API will have a receiver DS of this length
+
+	$outputVarname = 'listinfo';
+
+	$paramXml = $connection->getDummyReceiverAndLengthApiXml(1, $lengthOfReceiverVariable) . "\n" .
+	// param #3, list info
+	$connection->getListInfoApiXml(3) . "\n" . $connection->getNumberOfRecordsDesiredApiXml(4) . "\n" . $connection->getSortInformationApiXml(5) . "\n" . "<parm io='in' comment='6. Filter information' >
     <ds var='filterInfo' comment='Use format OSPF0100' len='dummy' >
       <data type='10i0' comment='Number of user names'>1</data>
       <data type='10a' comment='User name'>$userName</data>
@@ -2342,32 +2382,31 @@ function i5_spool_list($description = array(), $connection = null)
 
   <parm io='in' comment='8. Format of the generated list.'>
      <data var='listFormat' type='8a'>OSPL0300</data>
-  </parm>\n" .  
-   // param number 9
-   ToolkitServiceCw::getErrorDataStructXml(9) .
-  "\n<parm io='in' comment='10. Format name'>
+  </parm>\n" .
+	// param number 9
+	ToolkitServiceCw::getErrorDataStructXml(9) . "\n<parm io='in' comment='10. Format name'>
     <data var='format' type='8a' comment='Format name of data to receive'>OSPF0100</data>
   </parm>";
-      
-    // now call it!
-    // pass param xml directly in.
-        $retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
 
-        if($connection->getErrorCode()) {
-            i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
-            return false;
-        }
-        
-        
-        $retArr = $retPgmArr['io_param']['listinfo']; // 'listinfo' defined in getListInfoApiXml()
-        //d($retArr);
-        $totalRecords = $retArr['totalRecords'];
-        $requestHandle = $retArr['requestHandle'];
-        $listStatus = $retArr['listStatus']; // in case we need it
+	// now call it!
+	// pass param xml directly in.
+	$retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
 
-        
-    // receiver data we want to see
-    $receiverDs = "
+	if ($connection->getErrorCode()) {
+		i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
+		return false;
+	}
+
+	$retArr = $retPgmArr['io_param']['listinfo'];
+	// 'listinfo' defined in getListInfoApiXml()
+	//d($retArr);
+	$totalRecords = $retArr['totalRecords'];
+	$requestHandle = $retArr['requestHandle'];
+	$listStatus = $retArr['listStatus'];
+	// in case we need it
+
+	// receiver data we want to see
+	$receiverDs = "
       <data var='JOBNAME' type='10a' comment='Job name' />
       <data var='USERNAME' type='10a' comment='User name' />
       <data var='JOBNBR' type='6a' comment='Job number' />
@@ -2391,116 +2430,118 @@ function i5_spool_list($description = array(), $connection = null)
       <data var='reserved' type='3h' comment='Reserved' />
       <data var='INETPRINT' type='10i0' comment='Internet print protocol job identifier' />";
 
-    // from this point on, no CPFs will happen in this function.
-    noError();
-        
-    // make request for objects, but don't return any yet.
-    // Get a handle and total number of records.
-    // listinfo: totalRecords, firstRecordNumber, requestHandle. if firstRec... < totalRecords then can continue.
-    // return I5_ERR_BEOF when went past last record. get CPF GUI0006 when used invalid record#.
-    $listObj = new ListFromApi($requestHandle, $totalRecords, $receiverDs, $lengthOfReceiverVariable, $connection);
-    return $listObj;
-    
+	// from this point on, no CPFs will happen in this function.
+	noError();
 
-} //(i5_spool_list)
+	// make request for objects, but don't return any yet.
+	// Get a handle and total number of records.
+	// listinfo: totalRecords, firstRecordNumber, requestHandle. if firstRec... <
+	// totalRecords then can continue.
+	// return I5_ERR_BEOF when went past last record. get CPF GUI0006 when used
+	// invalid record#.
+	$listObj = new ListFromApi($requestHandle, $totalRecords, $receiverDs, $lengthOfReceiverVariable, $connection);
+	return $listObj;
+
+}//(i5_spool_list)
 
 /*Description: Gets spool file data from the queue.
-Return Values: next spool file data array in the list, or false if queue is empty.
-The data will be formated using SPLF0300 format. See following link for more details: http://publib.boulder.ibm.com/infocenter/iseries/v5r4/index.jsp?topic=/apis/QUSLSPL.htm
-Arguments: Spool_list resource received from i5_spool_list*/
-function i5_spool_list_read(&$list = null)
-{
-    return listRead($list);
-    
-} //(i5_spool_list_read)
+ Return Values: next spool file data array in the list, or false if queue is
+empty.
+ The data will be formated using SPLF0300 format. See following link for more
+details:
+http://publib.boulder.ibm.com/infocenter/iseries/v5r4/index.jsp?topic=/apis/QUSLSPL.htm
+ Arguments: Spool_list resource received from i5_spool_list*/
+function i5_spool_list_read(&$list = null) {
+	return listRead($list);
+
+}//(i5_spool_list_read)
 
 /*void i5_spool_list_close(resource spool_list)
-Description: Free spool list resource
-Return Values: Boolean success value*/
-function i5_spool_list_close($list = null)
-{
-    return listClose($list);
-    
-} //(i5_spool_list_close)
+ Description: Free spool list resource
+ Return Values: Boolean success value*/
+function i5_spool_list_close($list = null) {
+	return listClose($list);
 
-/*string i5_spool_get_data(string spool_name, string jobname, string username, integer job_number, integer spool_id [,string filename])
-Description: Get the data from the spool file.
-Return Values: String if no file name passed as parameter, false if function failes
-Arguments:
+}//(i5_spool_list_close)
+
+/*string i5_spool_get_data(string spool_name, string jobname, string username,
+ * integer job_number, integer spool_id [,string filename])
+ Description: Get the data from the spool file.
+ Return Values: String if no file name passed as parameter, false if function
+failes
+ Arguments:
  spool_name - The spool file name
  job_name - The name of the job that created the file
  job_number - The number of the job that created the file
  username - The username of the job that created the file
  spool_id - ID of the spool file in the queue
-            (NOTE: *LAST is ignored by old toolkit and new toolkit. Gets converted to a 1.)
- filename - IFS filename to store the data. If not provided, the data is returned as string
-*/
-function i5_spool_get_data($spoolName, $jobName, $userName, $jobNumber, $spoolNumber, $fileName = '', $connection = null)
-{
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-    
-    if (!is_numeric($spoolNumber)) {
-        // could be *NEXT or other misguided parameter. Use a '1' for compatibility.
-        $connection->logThis("Spool file number value '$spoolNumber' is unsupported. Please supply a number. The value '1' will be used.");
-        $spoolNumber = 1;
-    }
-    
-    $cmdString = "catsplf -j {$jobNumber}/{$userName}/{$jobName} {$spoolName} {$spoolNumber}";
-    
-    //full command will look like "QSH CMD('catsplf -j {$jobNumber}/{$userName}/{$jobName} {$spoolName} {$spoolNumber}')";
-    $result = $connection->qshellCommand($cmdString);
-    
-    // if no error, we expect an array.
-    if (is_array($result)) {
-        // consolidate into a string with 0D0A separators
-        $resultString = trim(implode("\r\n", $result));
+ (NOTE: *LAST is ignored by old toolkit and new toolkit. Gets converted to a 1.)
+ filename - IFS filename to store the data. If not provided, the data is returned
+as string
+ */
+function i5_spool_get_data($spoolName, $jobName, $userName, $jobNumber, $spoolNumber, $fileName = '', $connection = null) {
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-        // if fileName provided, try to write data to the IFS file (return true if successful or false).
-        // otherwise simply return the string.
-        if ($fileName) {
-            
-            $bytesWritten = file_put_contents($fileName, $resultString);
-            if ($bytesWritten) {
-                // good! Wrote OK
-                return true;
-            } else {
-                // bad! Could not write file. Old toolkit used CPF9898 so let's also use it.
-                i5CpfError('CPF9898', "Could not write to file '$fileName'.");
-                return false;    
-            } //(if bytesWritten)
-            
-            
-        } else {
-            // no IFS filename provided. Return string to caller.
-            return $resultString;
-        } //(if $fileName)
-        
-    } else {
-        // not an array. Probably a "false."
-        // Report the error.
-        $errMsg = $connection->getErrorMsg();
-        if (empty($errMsg)) {
-            $errMsg = 'Could not read spooled file. Check user permissions or see error code for details.';
-        }
-        i5CpfError($connection->getErrorCode(), $errMsg);
-        return false;
-    } //(if is_array)
-    
-    
-} //(i5_spool_get_data)
+	if (!is_numeric($spoolNumber)) {
+		// could be *NEXT or other misguided parameter. Use a '1' for compatibility.
+		$connection->logThis("Spool file number value '$spoolNumber' is unsupported. Please supply a number. The value '1' will be used.");
+		$spoolNumber = 1;
+	}
 
+	$cmdString = "catsplf -j {$jobNumber}/{$userName}/{$jobName} {$spoolName} {$spoolNumber}";
 
+	//full command will look like "QSH CMD('catsplf -j
+	// {$jobNumber}/{$userName}/{$jobName} {$spoolName} {$spoolNumber}')";
+	$result = $connection->qshellCommand($cmdString);
 
+	// if no error, we expect an array.
+	if (is_array($result)) {
+		// consolidate into a string with 0D0A separators
+		$resultString = trim(implode("\r\n", $result));
 
+		// if fileName provided, try to write data to the IFS file (return true if
+		// successful or false).
+		// otherwise simply return the string.
+		if ($fileName) {
+
+			$bytesWritten = file_put_contents($fileName, $resultString);
+			if ($bytesWritten) {
+				// good! Wrote OK
+				return true;
+			} else {
+				// bad! Could not write file. Old toolkit used CPF9898 so let's also use it.
+				i5CpfError('CPF9898', "Could not write to file '$fileName'.");
+				return false;
+			} //(if bytesWritten)
+
+		} else {
+			// no IFS filename provided. Return string to caller.
+			return $resultString;
+		} //(if $fileName)
+
+	} else {
+		// not an array. Probably a "false."
+		// Report the error.
+		$errMsg = $connection->getErrorMsg();
+		if (empty($errMsg)) {
+			$errMsg = 'Could not read spooled file. Check user permissions or see error code for details.';
+		}
+		i5CpfError($connection->getErrorCode(), $errMsg);
+		return false;
+	} //(if is_array)
+
+}//(i5_spool_get_data)
 
 // Object listings
-/*resource i5_objects_list(string library, [string name, string type, resource connection])
+/*resource i5_objects_list(string library, [string name, string type, resource
+ * connection])
  Description: Open an object list.
  Return Values: Resource for fetch if everything is OK, false on error.
  Arguments:
- library - Library name (can be also *CURLIB or I5_CURLIB). How about *LIBL? Try it
+ library - Library name (can be also *CURLIB or I5_CURLIB). How about *LIBL? Try
+it
  name - Name or wildcard of objects to read, default is "*ALL".
  type - Object type to fetch (*ALL or I5_ALL_OBJECTS for all)
  connection - Connection - result of i5_connect*/
@@ -2510,39 +2551,39 @@ function i5_spool_get_data($spoolName, $jobName, $userName, $jobNumber, $spoolNu
  * @param string[optional]        $type
  * @param i5_Connection[optional] $connection
  */
-function i5_objects_list($library, $name = '*ALL', $type = '*ALL', $connection = null)
-{
+function i5_objects_list($library, $name = '*ALL', $type = '*ALL', $connection = null) {
 
-// if object does not exist: No error. Get a resource but then an empty list.
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
- 
-    // TODO more type testing needed.    
-    if($name && !is_string($name)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Object name must be a string', 'Object name must be a string');
-        return false;
-    }
-    if(!$library) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Library is required.', 'Library is required.');
-        return false;
-    }
+	// if object does not exist: No error. Get a resource but then an empty list.
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-    $apiPgm = 'QGYOLOBJ'; /// object list
-    $apiLib = 'QSYS';
-    
-    $lengthOfReceiverVariable = 672; // list entry API will have a receiver DS of this length
-    
-    $outputVarname = 'listinfo';
-    
-    $paramXml = "
+	// TODO more type testing needed.
+	if ($name && !is_string($name)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Object name must be a string', 'Object name must be a string');
+		return false;
+	}
+	if (!$library) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Library is required.', 'Library is required.');
+		return false;
+	}
+
+	$apiPgm = 'QGYOLOBJ';
+	/// object list
+	$apiLib = 'QSYS';
+
+	$lengthOfReceiverVariable = 672;
+	// list entry API will have a receiver DS of this length
+
+	$outputVarname = 'listinfo';
+
+	$paramXml = "
      <parm io='out' comment='1. receiver. do not receive anything here. Wait till Get List Entry'>
     <data type='1h' comment='use hole type because do not expect data at this stage' />
   </parm>
   <parm io='in' comment='2. Length of receiver variable'>
     <data var='receiverLen' type='10i0' comment='format 0700 should have size $lengthOfReceiverVariable.'>$lengthOfReceiverVariable</data>
-  </parm>\n" .  $connection->getListInfoApiXml(3) . "\n" .
-  "<parm io='in' comment='4. Number of records to return. Use zero to offload to Get List Entries API'>
+  </parm>\n" . $connection->getListInfoApiXml(3) . "\n" . "<parm io='in' comment='4. Number of records to return. Use zero to offload to Get List Entries API'>
     <data var='numRecsDesired' type='10i0'>0</data>
   </parm>
   <parm io='in' comment='5. Sort information' >
@@ -2587,30 +2628,30 @@ function i5_objects_list($library, $name = '*ALL', $type = '*ALL', $connection =
     <ds var='keysToRequest'>
      <data var='key' type='10i0' comment='use key field format 0700 because it has everything.'>0700</data>
     </ds>
-  </parm>\n" .  ToolkitServiceCw::getErrorDataStructXml(12); // param number 12
-    
-    // now call it!
-    // pass param xml directly in.
-        $retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
-//var_dump($retPgmArr);
-//die;
- // there's a problem parsing the output xml.
-        
-        
-        if ($connection->getErrorCode()) {
-            i5ErrorActivity(I5_ERR_PHP_AS400_MESSAGE, I5_CAT_PHP, $connection->getErrorCode(), $connection->getErrorMsg());
-            return false;
-        }
-        
-       
-        $retArr = $retPgmArr['io_param']['listinfo']; // 'listinfo' defined in getListInfoApiXml()
-        $totalRecords = $retArr['totalRecords'];
-        $requestHandle = $retArr['requestHandle'];
-        $listStatus = $retArr['listStatus']; // in case we need it
+  </parm>\n" . ToolkitServiceCw::getErrorDataStructXml(12);
+	// param number 12
 
-        
-    // object data we want to see
-    $receiverDs = "<data var='NAME' comment='Object name' type='10a'></data>
+	// now call it!
+	// pass param xml directly in.
+	$retPgmArr = $connection->PgmCall($apiPgm, $apiLib, $paramXml);
+	//var_dump($retPgmArr);
+	//die;
+	// there's a problem parsing the output xml.
+
+	if ($connection->getErrorCode()) {
+		i5ErrorActivity(I5_ERR_PHP_AS400_MESSAGE, I5_CAT_PHP, $connection->getErrorCode(), $connection->getErrorMsg());
+		return false;
+	}
+
+	$retArr = $retPgmArr['io_param']['listinfo'];
+	// 'listinfo' defined in getListInfoApiXml()
+	$totalRecords = $retArr['totalRecords'];
+	$requestHandle = $retArr['requestHandle'];
+	$listStatus = $retArr['listStatus'];
+	// in case we need it
+
+	// object data we want to see
+	$receiverDs = "<data var='NAME' comment='Object name' type='10a'></data>
       <data var='LIBRARY' comment='Library name' type='10a'></data>
       <data var='TYPE' comment='Object type' type='10a'></data>
       <data var='STATUS' comment='Information status. Blank means success' type='1a'></data>
@@ -2683,244 +2724,250 @@ indicator' type='1a' />
       <data var='FILER6' comment='Filler to end of format' type='63h' />
     ";
 
-    // from this point on, no CPFs will happen in this function.
-    noError();
-    
-    // make request for objects, but don't return any yet.
-    // Get a handle and total number of records.
-    // listinfo: totalRecords, firstRecordNumber, requestHandle. if firstRec... < totalRecords then can continue.
-    // when reading list, return I5_ERR_BEOF when went past last record. get CPF GUI0006 when used invalid record#.
-    $listObj = new ListFromApi($requestHandle, $totalRecords, $receiverDs, $lengthOfReceiverVariable, $connection);
-    return $listObj;
-    
- 
-/*    $objectList = $objectObj->getObjectListCw($name, $library, $type);
-    return $objectList;    
-*/    
-} //(i5_objects_list)
+	// from this point on, no CPFs will happen in this function.
+	noError();
+
+	// make request for objects, but don't return any yet.
+	// Get a handle and total number of records.
+	// listinfo: totalRecords, firstRecordNumber, requestHandle. if firstRec... <
+	// totalRecords then can continue.
+	// when reading list, return I5_ERR_BEOF when went past last record. get CPF
+	// GUI0006 when used invalid record#.
+	$listObj = new ListFromApi($requestHandle, $totalRecords, $receiverDs, $lengthOfReceiverVariable, $connection);
+	return $listObj;
+
+	/*    $objectList = $objectObj->getObjectListCw($name, $library, $type);
+	 return $objectList;
+	 */
+}//(i5_objects_list)
 
 /*array i5_objects_list_read (resource list)
  Description: Get an array for an object list entries.
  Return Values: Array with the object element if OK; false if failed.
  Arguments: List - Resource returned by i5_objects_list
 
-*/
+ */
 
 // generic list reader
 // pass list by reference so its current element can be advanced
-function listRead(&$list)
-{
-    $connection = $list->getConn();
-    if (!$connection) {
-        return false;
-    }    
+function listRead(&$list) {
+	$connection = $list->getConn();
+	if (!$connection) {
+		return false;
+	}
 
-    // try to get the next list entry
-    // Note: this "list" logic is generic for all sorts of API lists.
-    $entry = $list->getNextEntry();
-    
-    if (!$entry) {
-        // no entry received
-        // if no error, or GUI0006/1 "end of file"
-        // we simply have no more records to receive.
-        $errorCode = $connection->getErrorCode();
-        if ($errorCode == '' || $errorCode == 'GUI0006' || $errorCode == 'GUI0001') {
-            i5ErrorActivity(I5_ERR_BEOF, I5_CAT_PHP, 'No more entries.', 'No more entries.');
-        } else {
-            // a real error.
-             i5CpfError($errorCode, $connection->getErrorMsg());
-        } //(errorcode check)
-        
-        return false;
-        
-    } //(no entry)
-    
-    // We have an entry
-    noError();
-    return $entry;
-    
-    
-} //(listRead)
+	// try to get the next list entry
+	// Note: this "list" logic is generic for all sorts of API lists.
+	$entry = $list->getNextEntry();
+
+	if (!$entry) {
+		// no entry received
+		// if no error, or GUI0006/1 "end of file"
+		// we simply have no more records to receive.
+		$errorCode = $connection->getErrorCode();
+		if ($errorCode == '' || $errorCode == 'GUI0006' || $errorCode == 'GUI0001') {
+			i5ErrorActivity(I5_ERR_BEOF, I5_CAT_PHP, 'No more entries.', 'No more entries.');
+		} else {
+			// a real error.
+			i5CpfError($errorCode, $connection->getErrorMsg());
+		}//(errorcode check)
+
+		return false;
+
+	}//(no entry)
+
+	// We have an entry
+	noError();
+	return $entry;
+
+}//(listRead)
+
 // generic list close-er
 // pass list by reference so list can be deactivated
-function listClose(&$list)
-{
+function listClose(&$list) {
 
-    
-    // if no list, return true, because it's not open.
-    if (!$list) {
-        noError();
-        return true;
-    }
+	// if no list, return true, because it's not open.
+	if (!$list) {
+		noError();
+		return true;
+	}
 
-    $connection = $list->getConn();
-    
-    // close the list
-    $success = $list->close();
-    
-    if ($success) {
-        noError();
-        $list = null; // deactivate list variable since we closed the list.
-    } else {
-        // error closing list. Provide error code/message.
-           i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
-           return false;
-    }
+	$connection = $list->getConn();
 
-    return $success;
+	// close the list
+	$success = $list->close();
 
-} //(listClose)
+	if ($success) {
+		noError();
+		$list = null;
+		// deactivate list variable since we closed the list.
+	} else {
+		// error closing list. Provide error code/message.
+		i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
+		return false;
+	}
+
+	return $success;
+
+}//(listClose)
 
 // pass list by reference so its current element can be advanced
-function i5_objects_list_read(&$list)
-{
-    return listRead($list);
-    
-} //(i5_objects_list_read)
+function i5_objects_list_read(&$list) {
+	return listRead($list);
+
+}//(i5_objects_list_read)
 
 /*bool i5_ objects_list_close (resource handle)
  Description: Close handle received from i5_ objects_list ().
  Return Values: Boolean success value
  Arguments: handle - Object list handle as returned by i5_ objects_list ()
-*/
-function i5_objects_list_close(&$list)
-{
-    return listClose($list);
-    
-} //(i5_objects_list_close)
+ */
+function i5_objects_list_close(&$list) {
+	return listClose($list);
 
+}//(i5_objects_list_close)
 
 // data queues
 // Note: there's no "dtaq_create" or "dtaq_delete" in the old toolkit.
 
-
-/*resource i5_dtaq_prepare(string name, array description [,int key][,resource connection])
+/*resource i5_dtaq_prepare(string name, array description [,int key][,resource
+ * connection])
  Description: Opens a data queue with optional description.
  Return Values: Resource if OK, false if failed.
  Arguments:
  $name - The queue name
- $description - Data description in format defined by program_prepare. For more, see PHP Toolkit Data Description.
+ $description - Data description in format defined by program_prepare. For more,
+see PHP Toolkit Data Description.
  [$key - key size - for keyed DataQ (can be omitted)]
  [$connection - Connection - result of i5_connect]
-*/
-function i5_dtaq_prepare($name, $description, $keySizeOrConnection = 0, ToolkitServiceCw $connection = null)
-{
+ */
+function i5_dtaq_prepare($name, $description, $keySizeOrConnection = 0, ToolkitServiceCw $connection = null) {
 
-    $keySize = 0; // init
-    // user is allowed to omit $keySize, so there may be a variable number of parameters
-        
-    // if $connection was passed, we know 4 args were passed.
-    // If not, we need to check.
-    if ($connection) {
+	$keySize = 0;
+	// init
+	// user is allowed to omit $keySize, so there may be a variable number of
+	// parameters
 
-        // connection was passed, so 3rd param is keySize.
-        $keySize = $keySizeOrConnection;
-        
-    } else {
-        $numArgs = func_num_args();
-           
-        if ($numArgs == 3) {
-    
-            // either key or connection was passed. Figure out which one.
-            if (is_numeric($keySizeOrConnection)) {
-                // numeric. Assume it's the key size.
-                $keySize = $keySizeOrConnection;
-                $connection = null;
-            } else {
-                // not numeric. keySize not used.
-              $keySize = 0;
-              // assume the third param is connection.
-              $connection = $keySizeOrConnection;
-          } //(is_numeric($keySizeOrConnection))
-        }
-    } //(if $connection)    
-    
-    // if conn not passed in, or passed as null/0, get instance of toolkit. If can't be obtained, return false.
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-    
-    // look for params
-    if (!isset($name)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing data queue name', 'Missing data queue name');
-        return false;
-    }
-    if (!is_string($name)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Data queue name must be a string', 'Data queue name must be a string');
-        return false;
-    }
-    if (!isset($description)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing description', 'Missing description');
-        return false;
-    }
-    if (!is_array($description)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Description must be an array', 'Description must be an array');
-        return false;
-    }
+	// if $connection was passed, we know 4 args were passed.
+	// If not, we need to check.
+	if ($connection) {
 
-    // key size must be numeric if exists
-    if (!empty($keySize) && !is_numeric($keySize)) {
-           i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Key size must be numeric', 'Key size must be numeric');
-        return false;
-    }
+		// connection was passed, so 3rd param is keySize.
+		$keySize = $keySizeOrConnection;
 
-    // avoid case sensitivity problems with a copy of array with lower-case keys.
-    $lowerDesc = array_change_key_case($description, CASE_LOWER);
-    
-    // Some of the following should also apply to user spaces, where
-    // multiple parameters get condensed into one.
-    
-    // If there's a single DS given, not wrapped in an array, remove the DS entirely, because according to documented use cases (e.g. p398 of Zend Server manual),
-    // the old toolkit will treat the DS contents as individual elements.
-    if (isset($lowerDesc['dsname'])) {
-        if (isset($lowerDesc['dsparm'])) {
-            // use array from value of dsparm.
-            $lowerDesc = $lowerDesc['dsparm'];
-        } else {
-               i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Description has DSName but not DSParm', 'Description has DSName but not DSParm');
-            return false;
-        } //(if dsparm is set)
-    } //(if dsname is set)
-    
-    // If data queue's data description is only one level deep (allowed in old toolkit), add a level so that it can sail through the conversion process.
-    // that is, if the Name is given on the first level, not inside another array.
-    // We'll remove this level later.
-    // Example: description can be $desc = array("Name" => "MyVal", "Type" => I5_TYPE_CHAR, "length" => 10);
-    //          with input value:        $value = 'abcd';
-    $isSingleLevelSimpleValue = false;
-    // if first element in array is NOT another array
-    
-    if (!is_array(current($lowerDesc))) {
+	} else {
+		$numArgs = func_num_args();
 
-    	// A single-level description passed to data queue prepare. Expect a single value for receive or send.
-        $isSingleLevelSimpleValue = true;
-        // wrap in an array. 
-        $description = array($lowerDesc);    
-        //$connection->logThis("Single-level description passed to data queue prepare. Expect a single value for receive or send.");
-        
-    } else {
-        // normal. not single-level. No need to wrap desc in an array.
-        $description = $lowerDesc;
-    } //(outer layer is not an array)
-    
-    // use object that can transform and check description for us.
-    $descObj = new DataDescription($name, $description, $connection);
-    
-    $descObj->setIsSingleLevelSimpleValue($isSingleLevelSimpleValue);
-    
-    // keysize
-    if ($keySize) {
-        $descObj->_miscAttributes['keySize'] = $keySize;
-    }
+		if ($numArgs == 3) {
 
-    noError();
-    return $descObj;
-    
-} //(i5_dtaq_prepare)
+			// either key or connection was passed. Figure out which one.
+			if (is_numeric($keySizeOrConnection)) {
+				// numeric. Assume it's the key size.
+				$keySize = $keySizeOrConnection;
+				$connection = null;
+			} else {
+				// not numeric. keySize not used.
+				$keySize = 0;
+				// assume the third param is connection.
+				$connection = $keySizeOrConnection;
+			} //(is_numeric($keySizeOrConnection))
+		}
+	}//(if $connection)
 
-/*mixed i5_dtaq_receive(resource queue[, string/int operator, string key][, int timeout])
+	// if conn not passed in, or passed as null/0, get instance of toolkit. If can't
+	// be obtained, return false.
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
+
+	// look for params
+	if (!isset($name)) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing data queue name', 'Missing data queue name');
+		return false;
+	}
+	if (!is_string($name)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Data queue name must be a string', 'Data queue name must be a string');
+		return false;
+	}
+	if (!isset($description)) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing description', 'Missing description');
+		return false;
+	}
+	if (!is_array($description)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Description must be an array', 'Description must be an array');
+		return false;
+	}
+
+	// key size must be numeric if exists
+	if (!empty($keySize) && !is_numeric($keySize)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Key size must be numeric', 'Key size must be numeric');
+		return false;
+	}
+
+	// avoid case sensitivity problems with a copy of array with lower-case keys.
+	$lowerDesc = array_change_key_case($description, CASE_LOWER);
+
+	// Some of the following should also apply to user spaces, where
+	// multiple parameters get condensed into one.
+
+	// If there's a single DS given, not wrapped in an array, remove the DS entirely,
+	// because according to documented use cases (e.g. p398 of Zend Server manual),
+	// the old toolkit will treat the DS contents as individual elements.
+	if (isset($lowerDesc['dsname'])) {
+		if (isset($lowerDesc['dsparm'])) {
+			// use array from value of dsparm.
+			$lowerDesc = $lowerDesc['dsparm'];
+		} else {
+			i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Description has DSName but not DSParm', 'Description has DSName but not DSParm');
+			return false;
+		} //(if dsparm is set)
+	}//(if dsname is set)
+
+	// If data queue's data description is only one level deep (allowed in old
+	// toolkit), add a level so that it can sail through the conversion process.
+	// that is, if the Name is given on the first level, not inside another array.
+	// We'll remove this level later.
+	// Example: description can be $desc = array("Name" => "MyVal", "Type" =>
+	// I5_TYPE_CHAR, "length" => 10);
+	//          with input value:        $value = 'abcd';
+	$isSingleLevelSimpleValue = false;
+	// if first element in array is NOT another array
+
+	if (!is_array(current($lowerDesc))) {
+
+		// A single-level description passed to data queue prepare. Expect a single value
+		// for receive or send.
+		$isSingleLevelSimpleValue = true;
+		// wrap in an array.
+		$description = array($lowerDesc);
+		//$connection->logThis("Single-level description passed to data queue prepare.
+		// Expect a single value for receive or send.");
+
+	} else {
+		// normal. not single-level. No need to wrap desc in an array.
+		$description = $lowerDesc;
+	}//(outer layer is not an array)
+
+	// use object that can transform and check description for us.
+	$descObj = new DataDescription($name, $description, $connection);
+
+	$descObj->setIsSingleLevelSimpleValue($isSingleLevelSimpleValue);
+
+	// keysize
+	if ($keySize) {
+		$descObj->_miscAttributes['keySize'] = $keySize;
+	}
+
+	noError();
+	return $descObj;
+
+}//(i5_dtaq_prepare)
+
+/*mixed i5_dtaq_receive(resource queue[, string/int operator, string key][, int
+ * timeout])
  Description: Reads data from the data queue.
- Return Values: False if could not read because of error or timeout, the data read from the queue otherwise.
+ Return Values: False if could not read because of error or timeout, the data
+read from the queue otherwise.
  Arguments:
  queue - resource received from dtaq_open
  operator:
@@ -2931,177 +2978,188 @@ function i5_dtaq_prepare($name, $description, $keySizeOrConnection = 0, ToolkitS
  "LE"
  key- key value to look for
  timeout - timeout value in seconds
-*/
-function i5_dtaq_receive($queue, $operatorOrTimeout = '', $key = '', $timeout = 0)
-{
-    // if <=2 params are received, the second one is timeout.
-    // if >2 params are received, the second one is operator.
-    $numArgs = func_num_args();
-    if ($numArgs <= 2) {
-        $timeout = $operatorOrTimeout;
-        $operator = '';
-    } else {
-        // > 2
-        $operator = $operatorOrTimeout;
-    }
-    
-    if (isset($queue->_miscAttributes['keySize'])) {
-        $keySize = $queue->_miscAttributes['keySize'];
-    }
-        
-    if (!isset($queue)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing data queue description', 'Missing data queue description');
-        return false;
-    }
-    if (!is_object($queue)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Data queue description must be a description resource', 'Data queue description must be a description resource');
-        return false;
-    }
-    
-    if ($operator && !is_string($operator)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Operator must be a string', 'Operator must be a string');
-        return false;
-    }
-    
-    if ($key && (!is_string($key) && !is_numeric($key))) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Key must be a string or number', 'Key must be a string or number');
-        return false;
-    }
-    
-    if ($timeout && !is_numeric($timeout)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Timeout must be numeric', 'Timeout must be numeric');
-        return false;
-    }
-    
-    $conn = $queue->getConnection();  
-    
-    // get lib and obj
-    $queueInfo = $queue->getObjInfo();
-    
-    // convert from old to new param format, inserting input values
-    $queue->setIsReceiverOnly(true); // receiver only, so it will use default/blank input values.
-    
-    $labelForSizeOfInputData = 'dssize';
-    $receiverVarName = 'receiverdata';
-    
-    $oldDescription = $queue->getOriginalDescription();
-    
-    // wrap data var in a ds so we can set size and get the result easily
-    // and also to wrap "loose" params passed in
-    $wrappedOldToolkitParams = array(array('DSName'=>$receiverVarName, 'DSParm'=>$oldDescription));
-    // use null because we're creating a receiver with no data yet.
-    $newInputParams = $queue->generateNewToolkitParams(null, $wrappedOldToolkitParams);
-    
-    // set back to default (false) for future use
-    $queue->setIsReceiverOnly(false); 
-    
-    if (!$newInputParams) {
-        // some problem converting
-        return false;
-    }
+ */
+function i5_dtaq_receive($queue, $operatorOrTimeout = '', $key = '', $timeout = 0) {
+	// if <=2 params are received, the second one is timeout.
+	// if >2 params are received, the second one is operator.
+	$numArgs = func_num_args();
+	if ($numArgs <= 2) {
+		$timeout = $operatorOrTimeout;
+		$operator = '';
+	} else {
+		// > 2
+		$operator = $operatorOrTimeout;
+	}
 
-    // only want one param, the data queue description
-       $receiveStructure = $newInputParams[0];
-    
-        $toolkitParams = array();
-        $toolkitParams [] = $conn->AddParameterChar ( 'in', 10, 'dqname', 'dqname', $queueInfo['obj']);
-        $toolkitParams [] = $conn->AddParameterChar ( 'in', 10, 'dqlib', 'dqlib', $queueInfo['lib']);
-        
-        $toolkitParams [] = $conn->AddParameterPackDec ( 'out', 5, 0, 'datalen', 'datalen', 100); // output so value doesn't matter
-        // wrap receiver var in a ds so we can set size and get the result easily
-        
-        // update "label for size of structure" in structure, so XMLSERVICE can get its size
-        $receiveStructure->setParamLabelLen($labelForSizeOfInputData);
-        $toolkitParams[] = $receiveStructure;//$receiveDs[] =
+	if (isset($queue->_miscAttributes['keySize'])) {
+		$keySize = $queue->_miscAttributes['keySize'];
+	}
 
-        $toolkitParams [] = $conn->AddParameterPackDec ( 'in', 5, 0, 'waittime', 'waittime', $timeout );
+	if (!isset($queue)) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing data queue description', 'Missing data queue description');
+		return false;
+	}
+	if (!is_object($queue)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Data queue description must be a description resource', 'Data queue description must be a description resource');
+		return false;
+	}
 
-        // not supporting sender info.
-        $senderInfLen = 0;
-        $senderInf = '';
-        
-        // if no keysize, first optional parameter group should be all zero or blank so the API will ignore it.
-        if (!isset($keySize) || empty($keySize)) {
-            $operator = '';
-            $keySize = 0;
-            $key = '';
-        }
-            
-        $toolkitParams [] = $conn->AddParameterChar ( 'in', 2, 'keyorder', 'keyorder', $operator );
-        $toolkitParams [] = $conn->AddParameterPackDec ( 'in', 3, 0, 'keydatalen', 'keydatalen', $keySize  );
-        $toolkitParams [] = $conn->AddParameterChar ( 'both', ( int ) $keySize , 'keydata', 'keydata', $key);
-        $senderInf = ' ';
-        $toolkitParams [] = $conn->AddParameterPackDec ( 'in', 3, 0, 'senderinflen', 'senderinflen', $senderInfLen );
-        $toolkitParams [] = $conn->AddParameterHole ( 'out', 1, 'senderinf', 'senderinf', $senderInf);
-            
-/*            if( $WithRemoveMsg == 'N')
-                $Remove= '*NO       ';
-            else     
-                $Remove= '*YES      ';
-*/
-        
-        $remove = '*YES      '; // default. no param for this in old toolkit
-        $toolkitParams [] = $conn->AddParameterChar ( 'in', 10, 'remove', 'remove',  $remove );
-        $toolkitParams [] = $conn->AddParameterSizePack ( 'in', 'receiversize', $labelForSizeOfInputData);
-        //$toolkitParams [] = $conn->AddErrorDataStruct();    
-        $toolkitParams [] = $conn->AddErrorDataStructZeroBytes(); // so errors bubble up to joblog
-        
-        $retPgmArr = $conn->PgmCall ( 'QRCVDTAQ', 'QSYS', $toolkitParams);
+	if ($operator && !is_string($operator)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Operator must be a string', 'Operator must be a string');
+		return false;
+	}
 
-    // check for any errors
-    if ($conn->getErrorCode()) {
-    	// an error
-        i5CpfError($conn->getErrorCode(), $conn->getErrorMsg());
-        return false;
-    } else {
-        // extricate the data from the receiver variable ds wrapper
-        $outputArray = $retPgmArr['io_param'][$receiverVarName];  
+	if ($key && (!is_string($key) && !is_numeric($key))) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Key must be a string or number', 'Key must be a string or number');
+		return false;
+	}
 
-        // shorthand, if description was a single character desc, return that char.
+	if ($timeout && !is_numeric($timeout)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Timeout must be numeric', 'Timeout must be numeric');
+		return false;
+	}
 
-        // was description / prepare a single-level array, implying a single value to be passed in?
-        $isSingleLevelSimpleValue = $queue->getIsSingleLevelSimpleValue();
-        
-        // if description/prepare was a single-level array, that is, a single value, then we expect that user passed in a value of the right type.
-        // 1. get the name of field.
-        // 2. extract data from that field name.
-        if ($isSingleLevelSimpleValue) {
-            $oldDescription = $queue->getOriginalDescription();
-    
-            // extract the important array from shell array
-            $name = '';
-            reset($oldDescription); // just in case
-            if (($innerDesc = current($oldDescription)) !== false) {
-                // there's the inner array. make keys lower case
-                $innerDesc = array_change_key_case($innerDesc, CASE_LOWER);
-                // get the field name
-                $name = (isset($innerDesc['name'])) ? $innerDesc['name'] : '';
-            }  
-            
-            if ($name) {
-                // have the field name. return data found under that name.
-                $singleValue = (isset($outputArray[$name])) ? $outputArray[$name] : '';  
-                $returnVal = $singleValue;
-                
-            } else {
-                i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Single-level description is missing a field name.');
-                return false;    
-            }
-    
-            // TODO also check for data type
+	$conn = $queue->getConnection();
 
-        } else {
-            // normal multi-level description
-            $returnVal = $outputArray;
-            
-        } //(if single level simple value)
+	// get lib and obj
+	$queueInfo = $queue->getObjInfo();
 
-        noError();
-        return $returnVal;
-    } //(if ($conn->getErrorCode()))
-    
-        
-} //(i5_dtaq_receive)
+	// convert from old to new param format, inserting input values
+	$queue->setIsReceiverOnly(true);
+	// receiver only, so it will use default/blank input values.
+
+	$labelForSizeOfInputData = 'dssize';
+	$receiverVarName = 'receiverdata';
+
+	$oldDescription = $queue->getOriginalDescription();
+
+	// wrap data var in a ds so we can set size and get the result easily
+	// and also to wrap "loose" params passed in
+	$wrappedOldToolkitParams = array( array(
+			'DSName' => $receiverVarName,
+			'DSParm' => $oldDescription
+		));
+	// use null because we're creating a receiver with no data yet.
+	$newInputParams = $queue->generateNewToolkitParams(null, $wrappedOldToolkitParams);
+
+	// set back to default (false) for future use
+	$queue->setIsReceiverOnly(false);
+
+	if (!$newInputParams) {
+		// some problem converting
+		return false;
+	}
+
+	// only want one param, the data queue description
+	$receiveStructure = $newInputParams[0];
+
+	$toolkitParams = array();
+	$toolkitParams[] = $conn->AddParameterChar('in', 10, 'dqname', 'dqname', $queueInfo['obj']);
+	$toolkitParams[] = $conn->AddParameterChar('in', 10, 'dqlib', 'dqlib', $queueInfo['lib']);
+
+	$toolkitParams[] = $conn->AddParameterPackDec('out', 5, 0, 'datalen', 'datalen', 100);
+	// output so value doesn't matter
+	// wrap receiver var in a ds so we can set size and get the result easily
+
+	// update "label for size of structure" in structure, so XMLSERVICE can get its
+	// size
+	$receiveStructure->setParamLabelLen($labelForSizeOfInputData);
+	$toolkitParams[] = $receiveStructure;
+	//$receiveDs[] =
+
+	$toolkitParams[] = $conn->AddParameterPackDec('in', 5, 0, 'waittime', 'waittime', $timeout);
+
+	// not supporting sender info.
+	$senderInfLen = 0;
+	$senderInf = '';
+
+	// if no keysize, first optional parameter group should be all zero or blank so
+	// the API will ignore it.
+	if (!isset($keySize) || empty($keySize)) {
+		$operator = '';
+		$keySize = 0;
+		$key = '';
+	}
+
+	$toolkitParams[] = $conn->AddParameterChar('in', 2, 'keyorder', 'keyorder', $operator);
+	$toolkitParams[] = $conn->AddParameterPackDec('in', 3, 0, 'keydatalen', 'keydatalen', $keySize);
+	$toolkitParams[] = $conn->AddParameterChar('both', ( int )$keySize, 'keydata', 'keydata', $key);
+	$senderInf = ' ';
+	$toolkitParams[] = $conn->AddParameterPackDec('in', 3, 0, 'senderinflen', 'senderinflen', $senderInfLen);
+	$toolkitParams[] = $conn->AddParameterHole('out', 1, 'senderinf', 'senderinf', $senderInf);
+
+	/*            if( $WithRemoveMsg == 'N')
+	 $Remove= '*NO       ';
+	 else
+	 $Remove= '*YES      ';
+	 */
+
+	$remove = '*YES      ';
+	// default. no param for this in old toolkit
+	$toolkitParams[] = $conn->AddParameterChar('in', 10, 'remove', 'remove', $remove);
+	$toolkitParams[] = $conn->AddParameterSizePack('in', 'receiversize', $labelForSizeOfInputData);
+	//$toolkitParams [] = $conn->AddErrorDataStruct();
+	$toolkitParams[] = $conn->AddErrorDataStructZeroBytes();
+	// so errors bubble up to joblog
+
+	$retPgmArr = $conn->PgmCall('QRCVDTAQ', 'QSYS', $toolkitParams);
+
+	// check for any errors
+	if ($conn->getErrorCode()) {
+		// an error
+		i5CpfError($conn->getErrorCode(), $conn->getErrorMsg());
+		return false;
+	} else {
+		// extricate the data from the receiver variable ds wrapper
+		$outputArray = $retPgmArr['io_param'][$receiverVarName];
+
+		// shorthand, if description was a single character desc, return that char.
+
+		// was description / prepare a single-level array, implying a single value to be
+		// passed in?
+		$isSingleLevelSimpleValue = $queue->getIsSingleLevelSimpleValue();
+
+		// if description/prepare was a single-level array, that is, a single value, then
+		// we expect that user passed in a value of the right type.
+		// 1. get the name of field.
+		// 2. extract data from that field name.
+		if ($isSingleLevelSimpleValue) {
+			$oldDescription = $queue->getOriginalDescription();
+
+			// extract the important array from shell array
+			$name = '';
+			reset($oldDescription);
+			// just in case
+			if (($innerDesc = current($oldDescription)) !== false) {
+				// there's the inner array. make keys lower case
+				$innerDesc = array_change_key_case($innerDesc, CASE_LOWER);
+				// get the field name
+				$name = (isset($innerDesc['name'])) ? $innerDesc['name'] : '';
+			}
+
+			if ($name) {
+				// have the field name. return data found under that name.
+				$singleValue = (isset($outputArray[$name])) ? $outputArray[$name] : '';
+				$returnVal = $singleValue;
+
+			} else {
+				i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Single-level description is missing a field name.');
+				return false;
+			}
+
+			// TODO also check for data type
+
+		} else {
+			// normal multi-level description
+			$returnVal = $outputArray;
+
+		}//(if single level simple value)
+
+		noError();
+		return $returnVal;
+	} //(if ($conn->getErrorCode()))
+
+}//(i5_dtaq_receive)
 
 /*bool i5_dtaq_send(resource queue, string key, mixed data)
  Description: Puts data to the data queue.
@@ -3110,268 +3168,284 @@ function i5_dtaq_receive($queue, $operatorOrTimeout = '', $key = '', $timeout = 
  queue - resource received from dtaq_open
  key - key value to look for
  data - data to put into the queue
-The data should conform to the description format, and can be either in flat array or key->value pair array.
-Yes, "flat array" should work. This is a single-level array description, in which case the data will be just a string value or some scalar value.
-*/
-function i5_dtaq_send($queue, $key='', $data)
-{
-    if (!$queue) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing data queue description', 'Missing data queue description');
-        return false;
-    }
-    if (!is_object($queue)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Data queue description must be a description resource', 'Data queue description must be a description resource');
-        return false;
-    }
-    if (!is_string($key)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Key must be a string if it is supplied.', 'Key must be a string if it is supplied.');
-        return false;
-    }
+ The data should conform to the description format, and can be either in flat
+array or key->value pair array.
+ Yes, "flat array" should work. This is a single-level array description, in
+which case the data will be just a string value or some scalar value.
+ */
+function i5_dtaq_send($queue, $key = '', $data) {
+	if (!$queue) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing data queue description', 'Missing data queue description');
+		return false;
+	}
+	if (!is_object($queue)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Data queue description must be a description resource', 'Data queue description must be a description resource');
+		return false;
+	}
+	if (!is_string($key)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Key must be a string if it is supplied.', 'Key must be a string if it is supplied.');
+		return false;
+	}
 
-    if (isset($queue->_miscAttributes['keySize'])) {
-        $keySize = $queue->_miscAttributes['keySize'];
-    }
+	if (isset($queue->_miscAttributes['keySize'])) {
+		$keySize = $queue->_miscAttributes['keySize'];
+	}
 
-    $conn = $queue->getConnection();  
-    
-    // get lib and obj
-    $queueInfo = $queue->getObjInfo();
-    
-    // is the description / prepare a single-level array, implying a single value to be passed in?
-    $isSingleLevelSimpleValue = $queue->getIsSingleLevelSimpleValue();
-    
-    $oldDescription = $queue->getOriginalDescription();
-    
-    // if description/prepare was a single-level array, that is, a single value, then we expect that user passed in a value of the right type.
-    // 1. get the name of field.
-    // 2. make "data" into an array with field name as key.
-    if ($isSingleLevelSimpleValue) {
-        
-        // Get name of single field from data description
-        $name = '';
-        reset($oldDescription); // just in case
-        // extract the important array from shell array
-        if (($innerDesc = current($oldDescription)) !== false) {
-            // there's the inner array. make keys lower case
-            $innerDesc = array_change_key_case($innerDesc, CASE_LOWER);
-            $name = (isset($innerDesc['name'])) ? $innerDesc['name'] : '';
-        }  
-        
-        if ($name) {
-            // have the field name. make a data input array with it.
-            $data = array($name=>$data);
-        } else {
-            i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Single-level description is missing a field name.');    
-        }
+	$conn = $queue->getConnection();
 
-        // TODO also check that data type in description matches data type in $data.
-                
-    } //(if single level simple value)
+	// get lib and obj
+	$queueInfo = $queue->getObjInfo();
 
-    $labelForSizeOfInputData = 'dssize';
-    $dsVarName = 'datavalue';
-    
-    // wrap data var in a ds so we can set size and get the result easily
-    // and also to wrap "loose" params passed in
-    $wrappedOldToolkitParams = array(array('DSName'=>$dsVarName, 'DSParm'=>$oldDescription));
+	// is the description / prepare a single-level array, implying a single value to
+	// be passed in?
+	$isSingleLevelSimpleValue = $queue->getIsSingleLevelSimpleValue();
 
-    // wrap the data, too, so it'll match up
-    $data = array($dsVarName => $data);
-    
-    $newInputParams = $queue->generateNewToolkitParams($data, $wrappedOldToolkitParams);
+	$oldDescription = $queue->getOriginalDescription();
 
-    if (!$newInputParams) {
-        // some problem converting
-        return false;
-    }
+	// if description/prepare was a single-level array, that is, a single value, then
+	// we expect that user passed in a value of the right type.
+	// 1. get the name of field.
+	// 2. make "data" into an array with field name as key.
+	if ($isSingleLevelSimpleValue) {
 
-    // only want one param, the data queue data description
-    $sendStructure = $newInputParams[0];
+		// Get name of single field from data description
+		$name = '';
+		reset($oldDescription);
+		// just in case
+		// extract the important array from shell array
+		if (($innerDesc = current($oldDescription)) !== false) {
+			// there's the inner array. make keys lower case
+			$innerDesc = array_change_key_case($innerDesc, CASE_LOWER);
+			$name = (isset($innerDesc['name'])) ? $innerDesc['name'] : '';
+		}
 
-    //QSNDDTAQ
-                
-    $toolkitParams = array();
-    $toolkitParams [] = $conn->AddParameterChar ( 'in', 10, 'dqname', 'dqname', $queueInfo['obj']);
-    $toolkitParams [] = $conn->AddParameterChar ( 'in', 10, 'dqlib', 'dqlib', $queueInfo['lib']);
-    $toolkitParams [] = $conn->AddParameterSizePack('in', 'datalen', $labelForSizeOfInputData);
-    //$sendDs[] = $sendStructure;
+		if ($name) {
+			// have the field name. make a data input array with it.
+			$data = array($name => $data);
+		} else {
+			i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Single-level description is missing a field name.');
+		}
 
-    // update "label for size of structure" in structure, so XMLSERVICE can get its size
-    $sendStructure->setParamLabelLen($labelForSizeOfInputData);
-    $toolkitParams[] = $sendStructure;//$conn->AddDataStruct($sendDs, $dsVarName, 0, '', false, $labelForSizeOfInputData);//
-    
-    
-    // if no keysize (came from preparation of queue),
-    // the first optional parameter group should be all zero or blank so the API will ignore it.
-    if (!isset($keySize) || empty($keySize)) {
-        $keySize = 0;
-        $key = '';
-    }
-    $toolkitParams[] = $conn->AddParameterPackDec('in', 3, 0, 'keydatalen','keydatalen', $keySize);        
-    $toolkitParams[] = $conn->AddParameterChar('in', $keySize, 'keydata','keydata',  $key);
+		// TODO also check that data type in description matches data type in $data.
 
-    // P.S. No error struct with QSNDDTAQ
-    $retPgmArr = $conn->PgmCall ( 'QSNDDTAQ', 'QSYS', $toolkitParams);
-        
-    if($conn->getErrorCode()) {
-       i5CpfError($conn->getErrorCode(), $conn->getErrorMsg());	
-       return false;
-    }
-        
-    //io_param]
-    if (isset($retPgmArr['io_param'])) {
-        noError();
-        return true;
-    }
+	}//(if single level simple value)
 
-} //(i5_dtaq_send)
+	$labelForSizeOfInputData = 'dssize';
+	$dsVarName = 'datavalue';
+
+	// wrap data var in a ds so we can set size and get the result easily
+	// and also to wrap "loose" params passed in
+	$wrappedOldToolkitParams = array( array(
+			'DSName' => $dsVarName,
+			'DSParm' => $oldDescription
+		));
+
+	// wrap the data, too, so it'll match up
+	$data = array($dsVarName => $data);
+
+	$newInputParams = $queue->generateNewToolkitParams($data, $wrappedOldToolkitParams);
+
+	if (!$newInputParams) {
+		// some problem converting
+		return false;
+	}
+
+	// only want one param, the data queue data description
+	$sendStructure = $newInputParams[0];
+
+	//QSNDDTAQ
+
+	$toolkitParams = array();
+	$toolkitParams[] = $conn->AddParameterChar('in', 10, 'dqname', 'dqname', $queueInfo['obj']);
+	$toolkitParams[] = $conn->AddParameterChar('in', 10, 'dqlib', 'dqlib', $queueInfo['lib']);
+	$toolkitParams[] = $conn->AddParameterSizePack('in', 'datalen', $labelForSizeOfInputData);
+	//$sendDs[] = $sendStructure;
+
+	// update "label for size of structure" in structure, so XMLSERVICE can get its
+	// size
+	$sendStructure->setParamLabelLen($labelForSizeOfInputData);
+	$toolkitParams[] = $sendStructure;
+	//$conn->AddDataStruct($sendDs, $dsVarName, 0, '', false,
+	// $labelForSizeOfInputData);//
+
+	// if no keysize (came from preparation of queue),
+	// the first optional parameter group should be all zero or blank so the API will
+	// ignore it.
+	if (!isset($keySize) || empty($keySize)) {
+		$keySize = 0;
+		$key = '';
+	}
+	$toolkitParams[] = $conn->AddParameterPackDec('in', 3, 0, 'keydatalen', 'keydatalen', $keySize);
+	$toolkitParams[] = $conn->AddParameterChar('in', $keySize, 'keydata', 'keydata', $key);
+
+	// P.S. No error struct with QSNDDTAQ
+	$retPgmArr = $conn->PgmCall('QSNDDTAQ', 'QSYS', $toolkitParams);
+
+	if ($conn->getErrorCode()) {
+		i5CpfError($conn->getErrorCode(), $conn->getErrorMsg());
+		return false;
+	}
+
+	//io_param]
+	if (isset($retPgmArr['io_param'])) {
+		noError();
+		return true;
+	}
+
+}//(i5_dtaq_send)
 
 /*bool i5_dtaq_close(resource queue)
  Description: Free program resource handle.
  Return Values: Bool success value.
- Arguments: queue - (pass by reference so it can be changed) resource received from dtaq_open
-*/
-function i5_dtaq_close(&$queue)
-{
-  noError();
-  $queue = null;
-  return true;
-} //(i5_dtaq_close)
+ Arguments: queue - (pass by reference so it can be changed) resource received
+from dtaq_open
+ */
+function i5_dtaq_close(&$queue) {
+	noError();
+	$queue = null;
+	return true;
+}//(i5_dtaq_close)
 
 // user spaces
 
-
-/*resource i5_userspace_prepare(string name, array description [, resource connection]).
+/*resource i5_userspace_prepare(string name, array description [, resource
+ * connection]).
  Description: Opens a user space and prepares it to be run.
  Return Values: Resource if open succeeded, false if open failed.
  Arguments:
  name - User space name in library/object format
- description - Data description in format defined by program_prepare. See PHP Toolkit Data Description.
+ description - Data description in format defined by program_prepare. See PHP
+Toolkit Data Description.
  connection - Result of i5_connect
-*/
-function i5_userspace_prepare($name, $description, $connection = null)
-{
-    // if conn not passed in, get instance of toolkit. If can't be obtained, return false.
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
-    
-    // look for params
-    if (!isset($name)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing user space name', 'Missing user space name');
-        return false;
-    }
-    if (!is_string($name)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'User space name must be a string', 'User space name must be a string');
-        return false;
-    }
-    if (!isset($description)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing description', 'Missing description');
-        return false;
-    }
-    if (!is_array($description)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Description must be an array', 'Description must be an array');
-        return false;
-    }
-    
-    // use object that can transform and check description for us.
-    $descObj = new DataDescription($name, $description, $connection);
+ */
+function i5_userspace_prepare($name, $description, $connection = null) {
+	// if conn not passed in, get instance of toolkit. If can't be obtained, return
+	// false.
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-    noError();
-    return $descObj;
+	// look for params
+	if (!isset($name)) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing user space name', 'Missing user space name');
+		return false;
+	}
+	if (!is_string($name)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'User space name must be a string', 'User space name must be a string');
+		return false;
+	}
+	if (!isset($description)) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing description', 'Missing description');
+		return false;
+	}
+	if (!is_array($description)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Description must be an array', 'Description must be an array');
+		return false;
+	}
 
-} //(i5_userspace_prepare)
+	// use object that can transform and check description for us.
+	$descObj = new DataDescription($name, $description, $connection);
+
+	noError();
+	return $descObj;
+
+}//(i5_userspace_prepare)
 
 /*bool i5_userspace_put(resource user space, params)
  Description: Add user space data
  Return Values: Boolean success value.
  Arguments:
  user - space User Space resource opened by i5_userspace_prepare
- params - Input params according to description. If given as flat array, then parameters are assigned in order (not sure about this)
-*/
+ params - Input params according to description. If given as flat array, then
+parameters are assigned in order (not sure about this)
+ */
 /**
  * Write date to a user space based on a prepare done before.
- * @param DataDescription $userspace   Userspace object created in the preparation stage.
- * @param array           $params      Input params with key=>value pairs (possibly nested),
- *                                     keys matching what was specified in prepare stage.
+ * @param DataDescription $userspace   Userspace object created in the
+ * preparation stage.
+ * @param array           $params      Input params with key=>value pairs
+ * (possibly nested),
+ *                                     keys matching what was specified in
+ * prepare stage.
  * @return boolean        True if successful, false if not.
  */
 
-function i5_userspace_put($userspace, $params)
-{
-    
-    if (!isset($userspace)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing user space description', 'Missing user space description');
-        return false;
-    }
-    if (!is_object($userspace)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'User space description must be a description resource', 'User space description must be a description resource');
-        return false;
-    }
-    if (!isset($params)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Params are required', 'Params are required');
-        return false;
-    }
-    if (!is_array($params)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Params must be an array', 'Params must be an array');
-        return false;
-    }
+function i5_userspace_put($userspace, $params) {
 
-    $conn = $userspace->getConnection();
-    
-    
-    // get lib and obj
-    $usInfo = $userspace->getObjInfo();
-    // format the user space name and library into 20 char format                                        
-    $usObj = new UserSpace();
-    $usObj->setUSName($usInfo['obj'], $usInfo['lib']);    
+	if (!isset($userspace)) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing user space description', 'Missing user space description');
+		return false;
+	}
+	if (!is_object($userspace)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'User space description must be a description resource', 'User space description must be a description resource');
+		return false;
+	}
+	if (!isset($params)) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Params are required', 'Params are required');
+		return false;
+	}
+	if (!is_array($params)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Params must be an array', 'Params must be an array');
+		return false;
+	}
 
-    $labelForSizeOfInputData = 'dssize';
-    $dsVarName = 'datavalue';
-    
-    // wrap data var in a ds so we can set size and get the result easily
-    // and also to wrap "loose" params passed in
-    $oldDescription = $userspace->getOriginalDescription();
-    $wrappedOldToolkitParams = array(array('DSName'=>$dsVarName, 'DSParm'=>$oldDescription));
+	$conn = $userspace->getConnection();
 
-    // wrap the data, too, so it'll match up
-    $data = array($dsVarName => $params);
-    
-    // convert from old to new param format, inserting input values
-    $newInputParams = $userspace->generateNewToolkitParams($data, $wrappedOldToolkitParams);
+	// get lib and obj
+	$usInfo = $userspace->getObjInfo();
+	// format the user space name and library into 20 char format
+	$usObj = new UserSpace();
+	$usObj->setUSName($usInfo['obj'], $usInfo['lib']);
 
-    if (!$newInputParams) {
-        // some problem converting
-        return false;
-    }
+	$labelForSizeOfInputData = 'dssize';
+	$dsVarName = 'datavalue';
 
-    // only want one param, the user space data description
-    $sendStructure = $newInputParams[0];
-    
+	// wrap data var in a ds so we can set size and get the result easily
+	// and also to wrap "loose" params passed in
+	$oldDescription = $userspace->getOriginalDescription();
+	$wrappedOldToolkitParams = array( array(
+			'DSName' => $dsVarName,
+			'DSParm' => $oldDescription
+		));
 
-       $toolkitParams = array();
-    $toolkitParams[] =  ToolkitService::AddParameterChar ('in', 20,"User space name and lib",'usfullname', $usObj->getUSFullName() );    
-    $toolkitParams[] =  ToolkitService::AddParameterInt32('in', "Starting position",'pos_from', 1);
-    $toolkitParams[] =  ToolkitService::AddParameterSize("Length of data",'dataLen', $labelForSizeOfInputData);
-    // update "label for size of structure" in structure, so XMLSERVICE can get its size
-    $sendStructure->setParamLabelLen($labelForSizeOfInputData);
-    $toolkitParams[] = $sendStructure;
-    
-    $toolkitParams[] =  ToolkitService::AddParameterChar('in', 1, "Force changes to auxiliary storage",'aux_storage' ,'0');
-    $toolkitParams[] =  ToolkitService::AddErrorDataStructZeroBytes();
-    
-    // write to the user space
-    $retPgmArr = $conn->PgmCall('QUSCHGUS', 'QSYS', $toolkitParams);
-    
-    // check for any errors
-    if ($conn->getErrorCode()) {
-        i5CpfError($conn->getErrorCode(), $conn->getErrorMsg());
-        return false;
-    } else {
-        noError();
-        return true;
-    }        
-} //(i5_userspace_put)
+	// wrap the data, too, so it'll match up
+	$data = array($dsVarName => $params);
+
+	// convert from old to new param format, inserting input values
+	$newInputParams = $userspace->generateNewToolkitParams($data, $wrappedOldToolkitParams);
+
+	if (!$newInputParams) {
+		// some problem converting
+		return false;
+	}
+
+	// only want one param, the user space data description
+	$sendStructure = $newInputParams[0];
+
+	$toolkitParams = array();
+	$toolkitParams[] = ToolkitService::AddParameterChar('in', 20, "User space name and lib", 'usfullname', $usObj->getUSFullName());
+	$toolkitParams[] = ToolkitService::AddParameterInt32('in', "Starting position", 'pos_from', 1);
+	$toolkitParams[] = ToolkitService::AddParameterSize("Length of data", 'dataLen', $labelForSizeOfInputData);
+	// update "label for size of structure" in structure, so XMLSERVICE can get its
+	// size
+	$sendStructure->setParamLabelLen($labelForSizeOfInputData);
+	$toolkitParams[] = $sendStructure;
+
+	$toolkitParams[] = ToolkitService::AddParameterChar('in', 1, "Force changes to auxiliary storage", 'aux_storage', '0');
+	$toolkitParams[] = ToolkitService::AddErrorDataStructZeroBytes();
+
+	// write to the user space
+	$retPgmArr = $conn->PgmCall('QUSCHGUS', 'QSYS', $toolkitParams);
+
+	// check for any errors
+	if ($conn->getErrorCode()) {
+		i5CpfError($conn->getErrorCode(), $conn->getErrorMsg());
+		return false;
+	} else {
+		noError();
+		return true;
+	}
+}//(i5_userspace_put)
 
 /*resource i5_userspace_get(resource user space, array params)
  Description: Retrieve user space data.
@@ -3379,190 +3453,208 @@ function i5_userspace_put($userspace, $params)
  Arguments:
  user space - User Space resource opened by i5_userspace_prepare
  params - output params with php variable names.
-POSSIBLY offset, too: Offset from the beginning of the user space, of the data to get. Not documented in Zend documentation.
-*/
-function i5_userspace_get($userspace, $params, $offset = 1)
-{
-    // check parameters
+ POSSIBLY offset, too: Offset from the beginning of the user space, of the data
+to get. Not documented in Zend documentation.
+ */
+function i5_userspace_get($userspace, $params, $offset = 1) {
+	// check parameters
 	if (!isset($userspace)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing user space description', 'Missing user space description');
-        return false;
-    }
-    if (!is_object($userspace)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'User space description must be a description resource', 'User space description must be a description resource');
-        return false;
-    }
-    if (!isset($params)) {
-        i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Params are required', 'Params are required');
-        return false;
-    }
-    if (!is_array($params)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Params must be an array', 'Params must be an array');
-        return false;
-    }
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Missing user space description', 'Missing user space description');
+		return false;
+	}
+	if (!is_object($userspace)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'User space description must be a description resource', 'User space description must be a description resource');
+		return false;
+	}
+	if (!isset($params)) {
+		i5ErrorActivity(I5_ERR_PHP_ELEMENT_MISSING, I5_CAT_PHP, 'Params are required', 'Params are required');
+		return false;
+	}
+	if (!is_array($params)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Params must be an array', 'Params must be an array');
+		return false;
+	}
 
-    $outputParams = $params;
-    
-    $conn = $userspace->getConnection();  
-    
-    // get lib and obj
-    $usInfo = $userspace->getObjInfo();
-    // format the user space name and library into 20 char format                                        
-    $usObj = new UserSpace();
-    $usObj->setUSName($usInfo['obj'], $usInfo['lib']);    
-    
-    // TODO be OK when no values are passed.
-    
-    // convert from old to new param format, inserting input values, when later call generateNewToolkitParams.
-    // It won't affect the "new toolkit" style params that we specify directly.
-    $userspace->setIsReceiverOnly(true); // receiver only, so it will use default/blank input values.
+	$outputParams = $params;
 
-    $labelForSizeOfInputData = 'dssize';
-    $receiverVarName = 'receiverdata';
-    
-    $oldDescription = $userspace->getOriginalDescription();
-    
-    // wrap data var in a ds so we can set size and get the result easily
-    // and also to wrap "loose" params passed in
-    $wrappedOldToolkitParams = array(array('DSName'=>$receiverVarName, 'DSParm'=>$oldDescription));
-    // use null because we're creating a receiver with no data yet.
-    $newInputParams = $userspace->generateNewToolkitParams(null, $wrappedOldToolkitParams);
-    
-    if (!$newInputParams) {
-        // some problem converting
-        return false;
-    }
+	$conn = $userspace->getConnection();
 
-    // only want one param, the data queue description
-    $receiveStructure = $newInputParams[0];
-        
-    $toolkitParams = array();
-    $toolkitParams[] = ToolkitService::AddParameterChar( 'in', 20,  "User space name and library", 'userspacename', $usObj->getUSFullName());    
-    $toolkitParams[] = ToolkitService::AddParameterInt32('in',  "From position", 'position_from', $offset);
-    $toolkitParams[] = ToolkitService::AddParameterSize("Length of data",'dataLen', $labelForSizeOfInputData);
-    // update "label for size of structure" in structure, so XMLSERVICE can get its size
-    $receiveStructure->setParamLabelLen($labelForSizeOfInputData);
-    $toolkitParams[] = $receiveStructure;//$receiveDs[] =
-    $toolkitParams[] = ToolkitService::AddErrorDataStructZeroBytes();
-    // read from the user space
-    $retPgmArr = $conn->PgmCall('QUSRTVUS', 'QSYS', $toolkitParams);    
+	// get lib and obj
+	$usInfo = $userspace->getObjInfo();
+	// format the user space name and library into 20 char format
+	$usObj = new UserSpace();
+	$usObj->setUSName($usInfo['obj'], $usInfo['lib']);
 
-    // check for any errors
-    //if( $conn->verify_CPFError($retPgmArr , "User space get failed.")) {
-    if ($conn->getErrorCode()) {
-        i5CpfError($conn->getErrorCode(), $conn->getErrorMsg());
-        return false;
-    } else {
-        // extricate the data from the receiver variable ds wrapper
-        $outputArray = $retPgmArr['io_param'][$receiverVarName];  
+	// TODO be OK when no values are passed.
 
-        // export vars then return true
-        if ($outputArray) {
-               //$exportedThem = exportPgmOutputVars($outputParams, $outputArray);
-               $exportedThem = $userspace->getConnection()->setOutputVarsToExport($outputParams, $outputArray);
-            if (!$exportedThem) {
-                return false;
-            }
-            
-        } //(retvals present)
+	// convert from old to new param format, inserting input values, when later call
+	// generateNewToolkitParams.
+	// It won't affect the "new toolkit" style params that we specify directly.
+	$userspace->setIsReceiverOnly(true);
+	// receiver only, so it will use default/blank input values.
 
-        noError();
-        return true;
-        
-    } //(if no errors)
-    
-} //(i5_userspace_get)
+	$labelForSizeOfInputData = 'dssize';
+	$receiverVarName = 'receiverdata';
+
+	$oldDescription = $userspace->getOriginalDescription();
+
+	// wrap data var in a ds so we can set size and get the result easily
+	// and also to wrap "loose" params passed in
+	$wrappedOldToolkitParams = array( array(
+			'DSName' => $receiverVarName,
+			'DSParm' => $oldDescription
+		));
+	// use null because we're creating a receiver with no data yet.
+	$newInputParams = $userspace->generateNewToolkitParams(null, $wrappedOldToolkitParams);
+
+	if (!$newInputParams) {
+		// some problem converting
+		return false;
+	}
+
+	// only want one param, the data queue description
+	$receiveStructure = $newInputParams[0];
+
+	$toolkitParams = array();
+	$toolkitParams[] = ToolkitService::AddParameterChar('in', 20, "User space name and library", 'userspacename', $usObj->getUSFullName());
+	$toolkitParams[] = ToolkitService::AddParameterInt32('in', "From position", 'position_from', $offset);
+	$toolkitParams[] = ToolkitService::AddParameterSize("Length of data", 'dataLen', $labelForSizeOfInputData);
+	// update "label for size of structure" in structure, so XMLSERVICE can get its
+	// size
+	$receiveStructure->setParamLabelLen($labelForSizeOfInputData);
+	$toolkitParams[] = $receiveStructure;
+	//$receiveDs[] =
+	$toolkitParams[] = ToolkitService::AddErrorDataStructZeroBytes();
+	// read from the user space
+	$retPgmArr = $conn->PgmCall('QUSRTVUS', 'QSYS', $toolkitParams);
+
+	// check for any errors
+	//if( $conn->verify_CPFError($retPgmArr , "User space get failed.")) {
+	if ($conn->getErrorCode()) {
+		i5CpfError($conn->getErrorCode(), $conn->getErrorMsg());
+		return false;
+	} else {
+		// extricate the data from the receiver variable ds wrapper
+		$outputArray = $retPgmArr['io_param'][$receiverVarName];
+
+		// export vars then return true
+		if ($outputArray) {
+			//$exportedThem = exportPgmOutputVars($outputParams, $outputArray);
+			$exportedThem = $userspace->getConnection()->setOutputVarsToExport($outputParams, $outputArray);
+			if (!$exportedThem) {
+				return false;
+			}
+
+		}//(retvals present)
+
+		noError();
+		return true;
+
+	} //(if no errors)
+
+}//(i5_userspace_get)
 
 /*bool i5_userspace_create(properties[, resource connection]).
  Description: Creates a new user space object.
  Return Values: Boolean success value
  Arguments:
  properties -
- I5_INITSIZE - The initial size of the user space being created. This value must be from 1 byte to 16, 776, 704 bytes.
+ I5_INITSIZE - The initial size of the user space being created. This value must
+be from 1 byte to 16, 776, 704 bytes.
  I5_DESCRIPTION - user space description
  I5_INIT_VALUE - The initial value of all bytes in the user space.
- I5_EXTEND_ATTRIBUT - extended attribute. The extended attribute must be a valid *NAME. For example, an object type of *FILE has an extended attribute of PF (physical file), LF (logical file), DSPF (display file), SAVF (save file), and so on.
- I5_AUTHORITY - The authority you give users who do not have specific private or group authority to the user space
+ I5_EXTEND_ATTRIBUT - extended attribute. The extended attribute must be a valid
+*NAME. For example, an object type of *FILE has an extended attribute of PF
+(physical file), LF (logical file), DSPF (display file), SAVF (save file), and so
+on.
+ I5_AUTHORITY - The authority you give users who do not have specific private or
+group authority to the user space
  I5_LIBNAME - Library name where the user space is located
  I5_NAME - User space name (10 char max)
  connection - Result of i5_connect
 
-*example:
-$property = array(
-I5_INITSIZE=>10,
-I5_DESCRIPTION=>"Created by PHP",
-I5_INIT_VALUE=>"A",
-I5_EXTEND_ATTRIBUT=>"File",
-I5_AUTHORITY=>"*ALL",
-I5_LIBNAME=>"PHPDEMO",
-I5_NAME=>"USERSPACE"
-);*/    
-function i5_userspace_create($properties = array(), $connection = null)
-{
-    if (!$connection = verifyConnection($connection)) {
-        return false;
-    }    
+ *example:
+ $property = array(
+ I5_INITSIZE=>10,
+ I5_DESCRIPTION=>"Created by PHP",
+ I5_INIT_VALUE=>"A",
+ I5_EXTEND_ATTRIBUT=>"File",
+ I5_AUTHORITY=>"*ALL",
+ I5_LIBNAME=>"PHPDEMO",
+ I5_NAME=>"USERSPACE"
+ );*/
+function i5_userspace_create($properties = array(), $connection = null) {
+	if (!$connection = verifyConnection($connection)) {
+		return false;
+	}
 
-    // check incoming $properties array
-    if (!$properties || !is_array($properties)) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Properties must be an array', 'Properties must be an array');
-        return false;
-        
-    }
-    
-    // name and library are the only required properties
-    if(!isset($properties[I5_LIBNAME]) || !$properties[I5_NAME]) {
-        i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Library and name are required', 'Library and name are required');
-        return false;
-    }
+	// check incoming $properties array
+	if (!$properties || !is_array($properties)) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Properties must be an array', 'Properties must be an array');
+		return false;
 
-    // TODO check initsize numeric, init_value single char, nonblank for other supplied properties
-    
-    // get values in fields to pass to toolkit
-    $possibleProperties = array(I5_INITSIZE, I5_DESCRIPTION, I5_INIT_VALUE, I5_EXTEND_ATTRIBUT, I5_AUTHORITY, I5_LIBNAME, I5_NAME);
-    
-    $options = array();
-    foreach ($possibleProperties as $possProp) {
-        // assign either the propery or '' to each property in array
-        $options[$possProp] = (isset($properties[$possProp])) ? $properties[$possProp] : '';
-    }
-    
-    // use Zend API toolkit create user space method
-    $usObj = new UserSpace($connection);
-    $success = $usObj->CreateUserSpace($options[I5_NAME], $options[I5_LIBNAME], $options[I5_INITSIZE], $options[I5_AUTHORITY],
-                                       $options[I5_INIT_VALUE], $options[I5_EXTEND_ATTRIBUT], $options[I5_DESCRIPTION]);    
+	}
 
-    if (!$success) {
-        i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
-        return false;
-    } else {        
-        noError();                                       
-        return true;
-    } //(if !$success))
-} //(i5_userspace_create)
+	// name and library are the only required properties
+	if (!isset($properties[I5_LIBNAME]) || !$properties[I5_NAME]) {
+		i5ErrorActivity(I5_ERR_PHP_TYPEPARAM, I5_CAT_PHP, 'Library and name are required', 'Library and name are required');
+		return false;
+	}
+
+	// TODO check initsize numeric, init_value single char, nonblank for other
+	// supplied properties
+
+	// get values in fields to pass to toolkit
+	$possibleProperties = array(
+		I5_INITSIZE,
+		I5_DESCRIPTION,
+		I5_INIT_VALUE,
+		I5_EXTEND_ATTRIBUT,
+		I5_AUTHORITY,
+		I5_LIBNAME,
+		I5_NAME
+	);
+
+	$options = array();
+	foreach ($possibleProperties as $possProp) {
+		// assign either the propery or '' to each property in array
+		$options[$possProp] = (isset($properties[$possProp])) ? $properties[$possProp] : '';
+	}
+
+	// use Zend API toolkit create user space method
+	$usObj = new UserSpace($connection);
+	$success = $usObj->CreateUserSpace($options[I5_NAME], $options[I5_LIBNAME], $options[I5_INITSIZE], $options[I5_AUTHORITY], $options[I5_INIT_VALUE], $options[I5_EXTEND_ATTRIBUT], $options[I5_DESCRIPTION]);
+
+	if (!$success) {
+		i5CpfError($connection->getErrorCode(), $connection->getErrorMsg());
+		return false;
+	} else {
+		noError();
+		return true;
+	} //(if !$success))
+}//(i5_userspace_create)
 
 // note: i5_userspace_delete does not exist in old toolkit
 
-// 
+//
 function i5_open() {
-    i5ErrorActivity(TO_BE_IMPLEMENTED, 0, "Record level access has not been implemented.", "Record level access has not been implemented.");
+	i5ErrorActivity(TO_BE_IMPLEMENTED, 0, "Record level access has not been implemented.", "Record level access has not been implemented.");
 	return false;
-} //(i5_open())
+}//(i5_open())
 
-
-// i5_output() returns variables from i5_program_call, i5_userspace_get, and sometimes i5_command.
+// i5_output() returns variables from i5_program_call, i5_userspace_get, and
+// sometimes i5_command.
 function i5_output() {
 
 	// get connection
 	if (!$connection = verifyConnection(null)) {
-        return false;
-    }    
-	
-    // return array of variables. Calling routine can do extract() with it.
-	return $connection->getOutputVarsToExport();
-	
-} //(i5_output())
+		return false;
+	}
 
+	// return array of variables. Calling routine can do extract() with it.
+	return $connection->getOutputVarsToExport();
+
+}//(i5_output())
 
 /**
  * Return version number of CW and PHP toolkit front-end.
@@ -3570,4 +3662,3 @@ function i5_output() {
 function i5_version() {
 	return ToolkitService::getFrontEndVersion();
 }
-
