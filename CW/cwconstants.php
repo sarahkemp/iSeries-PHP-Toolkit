@@ -3,6 +3,7 @@
 // constants.php
 // Old toolkit constants plus a few new ones
 
+//define('CW_VERSION', '1.4.0'); // moved to ToolkitService, constant VERSION
 define('CW_DOWNLOAD_SITE', 'http://www.youngiprofessionals.com/wiki/XMLSERVICE'); // TODO move to ToolkitService.php
 define('CW_PERSISTENT', 'persistent');
 define('CW_EXISTING_TRANSPORT_CONN', 'existingTransportConn'); // such as a database connection

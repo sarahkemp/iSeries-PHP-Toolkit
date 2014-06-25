@@ -26,7 +26,7 @@ class ToolkitService {
 	protected $db2 = false;
 	protected $db = null;
 
-	protected $_i5NamingFlag = 0; // default with value of 0. Other value is DB2_I5_NAMING_ON. 
+	protected $_i5NamingFlag = DB2_I5_NAMING_OFF; // default with value of 0. Other value is DB2_I5_NAMING_ON. 
 	protected $_schemaSep = '.'; // schema separator. A dot or slash
     protected $_validSeparators = array('.', '/');
 
@@ -56,9 +56,9 @@ class ToolkitService {
 					            'plugPrefix'     => 'iPLUG', // iPLUG (ibm_db2) or iPLUGR (odbc)
 								'XMLServiceLib'  => XMLSERVICELIB,
 								'v5r4'           => false, // whether to ask XMLSERVICE to carefully use features that v5r4 can handle
-								'sbmjobParams'   => 'ZENDSVR6/ZSVR_JOBD/XTOOLKIT', // in test mode, use QSYS/QSRVJOB/XTOOLKIT. Also see PLUGCONF1 and 2
+								'sbmjobParams'   => 'ZENDSVR/ZSVR_JOBD/XTOOLKIT', // in test mode, use QSYS/QSRVJOB/XTOOLKIT. Also see PLUGCONF1 and 2
 								'debug'          => false,
-								'debugLogFile'   => '/usr/local/zendsvr6/var/log/debug.log',
+								'debugLogFile'   => '/usr/local/zendsvr/share/ToolkitApi/debug.log',
 								// CCSID/Hex at a global/request level. These properties are also defined at a parameter object level.
 								'ccsidBefore'    => '',     
 								'ccsidAfter'     => '',
@@ -169,7 +169,7 @@ class ToolkitService {
 
 		// get settings from INI file
 		// TODO change getConfigValue to get many at one time 
-        $xmlServiceLib = $this->getConfigValue('system', 'XMLServiceLib', 'ZENDSVR6');
+        $xmlServiceLib = $this->getConfigValue('system', 'XMLServiceLib', 'ZENDSVR');
         $debug = $this->getConfigValue('system', 'debug', false);
         $debugLogFile = $this->getConfigValue('system', 'debugLogFile', false);
         $encoding = $this->getConfigValue('system', 'encoding', 'ISO-8859-1'); // XML encoding
@@ -867,10 +867,7 @@ Cause . . . . . :   Either a trigger program, external procedure, or external
 
 
 		if( $disconnect ) {
-			// Amit: Disconnect only if it was connected in the first place
-			if (! is_null($this->db)) {
-				$this->db->disconnect($this->conn);
-			}
+		    $this->db->disconnect($this->conn);
 
 		    if ($this->isDebug()) {
 			    $this->debugLog("Db disconnect requested and done.\n");
@@ -1670,7 +1667,7 @@ Cause . . . . . :   Either a trigger program, external procedure, or external
 
 	/* classPath(). for diagnostics, return the file system absolute path of this script.
 	 * Usage: echo 'The path of ToolkitService.php is: ' . ToolkitService::classPath();
-	 * Sample output: The path of ToolkitService.php is: /usr/local/zendsvr6/share/ToolkitApiDev-1.4.0/pre140/ToolkitService.php
+	 * Sample output: The path of ToolkitService.php is: /usr/local/zendsvr/share/ToolkitApiDev-1.4.0/pre140/ToolkitService.php
 	*/
 	static function classPath()
 	{

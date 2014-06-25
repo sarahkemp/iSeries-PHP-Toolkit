@@ -104,8 +104,7 @@ public function execXMLStoredProcedure( $conn, $stmt, $bindArray )
 	
 	//disconnect operation cause crush in fetch ,
 	//nothing appears as sql script.
-	 $row='';	
-	 $outputXML = '';
+	 $row='';
 	 if(!$disconnect){			
         while( odbc_fetch_row($crsr)) {
     		$tmp = odbc_result($crsr, 1);
