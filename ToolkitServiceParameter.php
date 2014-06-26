@@ -39,6 +39,9 @@ class ProgramParameter
 		$this->io              = (is_array($value)) ? 'both' : $io;
 		$this->comment         = $comment;
 		$this->varName         = $varName;
+		if ($io != 'out') {
+			$this->data = self::handleParamValue($type, $io, $comment, $varName, $value, $varying, $dimension, $by, $isArray, $labelSetLen, $labelLen, $ccsidBefore, $ccsidAfter, $useHex);
+		}
 		$this->data            = self::handleParamValue($type, $io, $comment, $varName, $value, $varying, $dimension, $by, $isArray,
 				                                        $labelSetLen, $labelLen, $ccsidBefore, $ccsidAfter, $useHex); // handles array with original info
 		$this->varying          = (is_array($value)) ? 'off' : $varying;
@@ -417,37 +420,94 @@ class CharParam extends ProgramParameter{
 	function __construct($io, $size , $comment,  $varName = '', $value , $varying = 'off',$dimension = 0, $by='', $isArray = false,
 			             $ccsidBefore = '', $ccsidAfter = '', $useHex = false)
 	{
-		$type = sprintf("%dA", $size);
+		$type = $size . 'A';
+		$value = self::validate($value, $size);
 		parent::__construct( $type,  $io, $comment, $varName, $value, $varying, $dimension, $by, $isArray,
 				             null, null, $ccsidBefore, $ccsidAfter, $useHex);
 		return $this; // fluent interface
 	}
+	
+	static function validate($value, $length, $truncate = true) {
+		if (is_null($value)) {
+			$value = '';
+		}
+		if ($truncate) {
+			return substr($value, 0, $length);
+		}
+		if (strlen($value) > $length) {
+			throw new OverflowException('CharParam is longer than ' . $length . ' characters');
+		}
+		return $value;
+	}
 }
 
-class ZonedParam extends ProgramParameter{
-	function __construct($io, $length ,$scale , $comment,  $varName = '', $value, $dimension=0, $by='', $isArray = false)
-	{
-		$type = sprintf("%ds%d", $length, $scale);
-		parent::__construct( $type,  $io, $comment, $varName, $value, 'off', $dimension, $by, $isArray, null, null, '', '', false);
+class NumericParam extends ProgramParameter {
+	var $scale, $length, $type, $value;
+	function __construct($io, $comment = '', $varName = '', $value, $varying = 'off', $dimension = 0, $by = 'ref', $isArray = false, $labelSetLen = null, $labelLen = null, $ccsidBefore = '', $ccsidAfter = '', $useHex = false) {
+		$this->value = self::validate($value, $this->length, $this->scale);
+		$type = $this->length . $this->type . $this->scale;
+		parent::__construct($type, $io, $comment, $varName, $this->value, $varying, $dimension, $by, $isArray, $labelSetLen, $labelLen, $ccsidBefore, $ccsidAfter, $useHex);
+	}
+
+	static function validate($value, $length, $scale = 0) {
+		$val = $value;
+		if (is_null($val)) {
+			$val = 0;
+		}
+		// zoned must be decimal-y
+		if (!is_numeric($val)) {
+			throw new InvalidArgumentException('Invalid value (' . $value . ') sent as type {' . $length . ',' . $scale . '}');
+		}
+		$val = (float)$val;
+
+		//make sure significant truncation will not occur
+		$pieces = explode('.', $val, 2);
+		if (isset($pieces[0]) && isset($pieces[1])) {
+			$sigDigits = $pieces[0];
+			$insigDigits = $pieces[1];
+			if (strlen($sigDigits) > $length) {
+				throw new OverflowException('NumericParam value exceeds given length (' . $length . ') value is (' . $value . ')');
+			}
+			if (strlen($insigDigits) > $scale) {
+				$val = round($val, $scale);
+			}
+		} else if (strlen($val) > $length) {
+			throw new OverflowException('NumericParam value exceeds given length (' . $length . ') value is (' . $value . ')');
+		}
+		return $val;
+	}
+}
+
+class ZonedParam extends NumericParam {
+	function __construct($io, $length, $scale, $comment, $varName = '', $value, $dimension = 0, $by = '', $isArray = false) {
+		$this->length = $length;
+		$this->scale = $scale;
+		$this->type = 's';
+		parent::__construct($io, $comment, $varName, $value, 'off', $dimension, $by, $isArray, null, null, '', '', false);
 		return $this;
 	}
 }
 
-class PackedDecParam extends ProgramParameter {
-	function __construct($io, $length, $scale , $comment,  $varName = '', $value,$dimension=0, $by='', $isArray = false,  $labelSetLen = null) {
-    	$type = sprintf("%dp%d", $length, $scale);
-		parent::__construct( $type,  $io, $comment, $varName, $value, 'off', $dimension, $by, $isArray, $labelSetLen, null, '', '', false);
+class PackedDecParam extends NumericParam {
+	function __construct($io, $length, $scale, $comment, $varName = '', $value, $dimension = 0, $by = '', $isArray = false, $labelSetLen = null) {
+		$this->length = $length;
+		$this->scale = $scale;
+		$this->type = 'p';
+		parent::__construct($io, $comment, $varName, $value, 'off', $dimension, $by, $isArray, $labelSetLen, null, '', '', false);
 		return $this;
 	}
 }
 
 // TODO continue wiht $isMulti
 
-class Int32Param extends ProgramParameter{
-	 function __construct($io,  $comment,  $varName = '', $value, $dimension=0, $by='', $isArray = false, $labelSetLen = null) {
-		parent::__construct(  '10i0', $io, $comment, $varName, $value, 'off', $dimension, $by, $isArray, $labelSetLen, null  );
+class Int32Param extends NumericParam {
+	function __construct($io, $comment, $varName = '', $value, $dimension = 0, $by = '', $isArray = false, $labelSetLen = null) {
+		$this->length = 10;
+		$this->scale = 0;
+		$this->type = 'i';
+		parent::__construct($io, $comment, $varName, $value, 'off', $dimension, $by, $isArray, $labelSetLen, null);
 		return $this;
-	 }
+	}
 }
 
 class SizeParam extends Int32Param{
@@ -465,13 +525,16 @@ class SizePackParam extends PackedDecParam{
 	 }
 }
 
-
-class Int64Param extends ProgramParameter{
-	function __construct( $io,  $comment,  $varName = '', $value, $dimension=0, $by='', $isArray = false){
-		parent::__construct('20i0',  $io, $comment, $varName, $value, 'off', $dimension, $by, $isArray );
+class Int64Param extends NumericParam {
+	function __construct($io, $comment, $varName = '', $value, $dimension = 0, $by = '', $isArray = false) {
+		$this->length = 20;
+		$this->scale = 0;
+		$this->type = 'i';
+		parent::__construct($io, $comment, $varName, $value, 'off', $dimension, $by, $isArray);
 		return $this;
 	}
 }
+
 class UInt32Param extends ProgramParameter{
 	 function __construct($io,  $comment,  $varName = '', $value, $dimension=0, $by='', $isArray = false) {
 		parent::__construct(  '10u0', $io, $comment, $varName, $value, 'off', $dimension, $by, $isArray );
