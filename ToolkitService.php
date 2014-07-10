@@ -1068,7 +1068,7 @@ Cause . . . . . :   Either a trigger program, external procedure, or external
     		case 'QSH0005':
     			// get status code.
     			// String will be something like: QSH0005: Command ended normally with exit status 1.
-    			// But in German: Befehl wurde normal mit AusfËhrungsstatus &1 beendet.
+    			// But in German: Befehl wurde normal mit Ausfï¿½hrungsstatus &1 beendet.
     			// look for a space (\b is word boundary), then the number, then a period OR another word boundary.
     			$pattern = '/\b([\d]+)[\b\.]/';
 		        // look for a match
@@ -1934,7 +1934,20 @@ Cause . . . . . :   Either a trigger program, external procedure, or external
 	
 	} //(getConfigValue)
 	
+	public function printErrors($joblog = false) {
+        echo '<p>';
+        echo htmlentities($this -> getErrorMsg());
+        echo '</p>';
+        if ($joblog) {
+            $this -> printJobLog();
+        }
+    }
 	
+	public function printJobLog() {
+        echo '<pre>';
+        echo $this -> joblog;
+        echo '</pre>';
+    }
 } //(class ToolkitService)
 
 // Class ends above.
@@ -1947,6 +1960,8 @@ function getConfigValue($heading, $key, $default = null)
     return ToolkitService::getConfigValue($heading, $key, $default);
     
 } //(function getConfigValue())
+
+
 
 function logThis($msg) {
 	$logFile = getConfigValue('log','logfile');
